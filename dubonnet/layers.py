@@ -1,4 +1,5 @@
 import math
+from re import L
 import torch
 
 
@@ -90,14 +91,69 @@ class ExpNormalSmearing(torch.nn.Module):
             ** 2
         )
 
-class DubonLayer(torch.nn.Module):
+class BasisGeneration(torch.nn.Module):
     def __init__(
         self,
         in_features,
-        out_features,
-        smearing: torch.nn.Module = ExpNormalSmearing,
+        hidden_features,
+        num_rbf,
+        num_basis,
     ):
-        super(DubonLayer, self).__init__()
+        super(BasisGeneration, self).__init__()
+        self.fc = torch.nn.Linear(2 * in_features, hidden_features)
+
+
+    def forward(self, h):
+        pass
+
+
+
+
+
+class DubonNet(torch.nn.Module):
+    def __init__(
+        self,
+        in_features,
+        num_rbf,
+        num_basis,
+    ):
+        super(DubonNet, self).__init__()
         self.in_features = in_features
-        self.out_features = out_features
-        self.smearing = smearing
+        self.smearing = ExpNormalSmearing(num_rbf=num_rbf)
+        self.basis_generation = BasisGeneration(
+            in_features=in_features, num_rbf=num_rbf, num_basis=num_basis,
+        )
+
+    def forward(self, h, x):
+        # (N, N, 3)
+        delta_x = x[..., None, :, :] - x[..., :, None, :]
+
+        # (N, N, 1)
+        delta_x_norm = torch.norm(delta_x, dim=-1).unsqueeze(-1)
+
+        # (N, N, N_rbf)
+        delta_x_smeared = self.smearing(delta_x_norm)
+
+        # (N, N, 3)
+        delta_x_unit = delta_x / delta_x_norm
+
+        # (N, N, 3, N_rbf)
+        basis = delta_x_unit.unsqueeze(-1) * delta_x_smeared.unsqueeze(-2)
+
+        # (N, N, N_rbf, N_basis)
+        K, Q, W0, W1 = self.basis_generation(h)
+
+        # (N, N, 3, N_basis)
+        K, Q = torch.matmul(basis, K), torch.matmul(basis, Q)
+
+        # (N, N, N_basis)
+        Z = torch.tensordot(K, Q, dims=([-2], [-2]))
+
+        # (N, N, 1)
+        Z = (Z @ W0).tanh() @ W1
+        return Z.sum()
+
+
+
+
+
