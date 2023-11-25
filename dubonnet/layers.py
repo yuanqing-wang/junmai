@@ -1,5 +1,4 @@
 import math
-from re import L
 import torch
 
 
@@ -43,7 +42,7 @@ class ExpNormalSmearing(torch.nn.Module):
         cutoff_upper=5.0,
         num_rbf=50,
         trainable=True,
-        cutoff=False,
+        cutoff=True,
     ):
         super(ExpNormalSmearing, self).__init__()
         self.cutoff_lower = cutoff_lower
@@ -53,6 +52,8 @@ class ExpNormalSmearing(torch.nn.Module):
         self.alpha = 5.0 / (cutoff_upper - cutoff_lower)
         if cutoff:
             self.cutoff_fn = CosineCutoff(0, cutoff_upper)
+        else:
+            self.cutoff_fn = lambda x: torch.ones_like(x)
 
         means, betas = self._initial_params()
         if trainable:
@@ -89,7 +90,7 @@ class ExpNormalSmearing(torch.nn.Module):
                 - self.means
             )
             ** 2
-        )
+        ) * self.cutoff_fn(dist)
 
 class BasisGeneration(torch.nn.Module):
     def __init__(
@@ -98,31 +99,45 @@ class BasisGeneration(torch.nn.Module):
         hidden_features,
         num_rbf,
         num_basis,
+        num_heads=1,
     ):
         super(BasisGeneration, self).__init__()
-        self.fc = torch.nn.Linear(2 * in_features, hidden_features)
-
+        self.fc = torch.nn.Linear(in_features, hidden_features)
+        self.attn = torch.nn.MultiheadAttention(hidden_features, num_heads)
+        self.out_features = (
+            num_rbf * num_basis,
+            num_rbf * num_basis,
+            num_basis * num_basis,
+            num_basis * num_basis,
+        )
+        self.fc_basis = torch.nn.Linear(hidden_features, sum(self.out_features))
 
     def forward(self, h):
-        pass
-
-
-
-
+        h = self.fc(h)
+        h, _ = self.attn(h, h, h)
+        n_nodes = int(h.shape[-2])
+        h = torch.cat(
+            [
+                h.unsqueeze(-3).repeat_interleave(n_nodes, -3),
+                h.unsqueeze(-2).repeat_interleave(n_nodes, -2),
+            ],
+            dim=-1
+        )
+        h = self.fc_basis(h)
+        K, Q, W0, W1 = torch.split(h, self.out_features, dim=-1)
+        return K, Q, W0, W1
 
 class DubonNet(torch.nn.Module):
     def __init__(
         self,
         in_features,
-        num_rbf,
-        num_basis,
+        smearing,
+        basis_generation,
     ):
         super(DubonNet, self).__init__()
         self.in_features = in_features
-        self.smearing = ExpNormalSmearing(num_rbf=num_rbf)
-        self.basis_generation = BasisGeneration(
-            in_features=in_features, num_rbf=num_rbf, num_basis=num_basis,
-        )
+        self.smearing = smearing
+        self.basis_generation = basis_generation
 
     def forward(self, h, x):
         # (N, N, 3)
@@ -140,7 +155,7 @@ class DubonNet(torch.nn.Module):
         # (N, N, 3, N_rbf)
         basis = delta_x_unit.unsqueeze(-1) * delta_x_smeared.unsqueeze(-2)
 
-        # (N, N, N_rbf, N_basis)
+        # (N, N, N_rbf, N_basis) & (N, N, N_basis, N_basis)
         K, Q, W0, W1 = self.basis_generation(h)
 
         # (N, N, 3, N_basis)
