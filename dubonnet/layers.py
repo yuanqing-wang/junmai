@@ -1,9 +1,12 @@
 import math
 import torch
 
+NUM_RBF = 50
+CUTOFF_LOWER = 0.0
+CUTOFF_UPPER = 5.0
 
 class CosineCutoff(torch.nn.Module):
-    def __init__(self, cutoff_lower=0.0, cutoff_upper=5.0):
+    def __init__(self, cutoff_lower=CUTOFF_LOWER, cutoff_upper=CUTOFF_UPPER):
         super(CosineCutoff, self).__init__()
         self.cutoff_lower = cutoff_lower
         self.cutoff_upper = cutoff_upper
@@ -38,10 +41,10 @@ class CosineCutoff(torch.nn.Module):
 class ExpNormalSmearing(torch.nn.Module):
     def __init__(
         self,
-        cutoff_lower=0.0,
-        cutoff_upper=5.0,
-        num_rbf=50,
-        trainable=True,
+        cutoff_lower=CUTOFF_LOWER,
+        cutoff_upper=CUTOFF_UPPER,
+        num_rbf=NUM_RBF,
+        trainable=False,
         cutoff=True,
     ):
         super(ExpNormalSmearing, self).__init__()
@@ -91,55 +94,16 @@ class ExpNormalSmearing(torch.nn.Module):
             )
             ** 2
         ) * self.cutoff_fn(dist)
-
+    
 class BasisGeneration(torch.nn.Module):
     def __init__(
         self,
-        in_features,
-        hidden_features,
-        num_rbf,
-        num_basis,
-        num_heads=1,
-    ):
-        super(BasisGeneration, self).__init__()
-        self.fc = torch.nn.Linear(in_features, hidden_features)
-        self.attn = torch.nn.MultiheadAttention(hidden_features, num_heads)
-        self.out_features = (
-            num_rbf * num_basis,
-            num_rbf * num_basis,
-            num_basis * num_basis,
-            num_basis * num_basis,
-        )
-        self.fc_basis = torch.nn.Linear(hidden_features, sum(self.out_features))
-
-    def forward(self, h):
-        h = self.fc(h)
-        h, _ = self.attn(h, h, h)
-        n_nodes = int(h.shape[-2])
-        h = torch.cat(
-            [
-                h.unsqueeze(-3).repeat_interleave(n_nodes, -3),
-                h.unsqueeze(-2).repeat_interleave(n_nodes, -2),
-            ],
-            dim=-1
-        )
-        h = self.fc_basis(h)
-        K, Q, W0, W1 = torch.split(h, self.out_features, dim=-1)
-        return K, Q, W0, W1
-
-class DubonNet(torch.nn.Module):
-    def __init__(
-        self,
-        in_features,
         smearing,
-        basis_generation,
     ):
-        super(DubonNet, self).__init__()
-        self.in_features = in_features
+        super().__init__()
         self.smearing = smearing
-        self.basis_generation = basis_generation
 
-    def forward(self, h, x):
+    def forward(self, x):
         # (N, N, 3)
         delta_x = x[..., None, :, :] - x[..., :, None, :]
 
@@ -154,19 +118,49 @@ class DubonNet(torch.nn.Module):
 
         # (N, N, 3, N_rbf)
         basis = delta_x_unit.unsqueeze(-1) * delta_x_smeared.unsqueeze(-2)
+        return basis
 
-        # (N, N, N_rbf, N_basis) & (N, N, N_basis, N_basis)
-        K, Q, W0, W1 = self.basis_generation(h)
+class ParameterGeneration(torch.nn.Module):
+    def __init__(
+        self,
+        in_features,
+        hidden_features,
+        num_basis,
+        num_rbf=NUM_RBF,
+        num_heads=1,
+    ):
+        super().__init__()
+        self.num_rbf = num_rbf
+        self.num_basis = num_basis
+        self.fc = torch.nn.Linear(in_features, hidden_features)
+        self.attn = torch.nn.MultiheadAttention(hidden_features, num_heads)
+        self.out_features = (
+            num_rbf * num_basis,
+            num_rbf * num_basis,
+            num_basis * num_basis,
+            num_basis * num_basis,
+        )
+        self.fc_basis = torch.nn.Linear(2*hidden_features, sum(self.out_features))
 
-        # (N, N, 3, N_basis)
-        K, Q = torch.matmul(basis, K), torch.matmul(basis, Q)
-
-        # (N, N, N_basis)
-        Z = torch.tensordot(K, Q, dims=([-2], [-2]))
-
-        # (N, N, 1)
-        Z = (Z @ W0).tanh() @ W1
-        return Z.sum()
+    def forward(self, h):
+        h = self.fc(h)
+        h, _ = self.attn(h, h, h)
+        n_nodes = int(h.shape[-2])
+        h = torch.cat(
+            [
+                h.unsqueeze(-3).repeat_interleave(n_nodes, -3),
+                h.unsqueeze(-2).repeat_interleave(n_nodes, -2),
+            ],
+            dim=-1
+        )
+        h = self.fc_basis(h)
+        K, Q, W0, W1 = torch.split(h, self.out_features, dim=-1)
+        K = K.reshape(*K.shape[:-1], self.num_rbf, self.num_basis)
+        Q = Q.reshape(*Q.shape[:-1], self.num_rbf, self.num_basis)
+        W0 = W0.reshape(*W0.shape[:-1], self.num_basis, self.num_basis)
+        W1 = W1.reshape(*W1.shape[:-1], self.num_basis, 1)
+        return K, Q, W0, W1
+    
 
 
 
