@@ -23,8 +23,8 @@ def test_parameter_generation():
     K, Q, W0, W1 = parameter_generation(h)
     assert K.shape == (100, 100, 50, 128)
     assert Q.shape == (100, 100, 50, 128)
-    assert W0.shape == (100, 100, 128, 128)
-    assert W1.shape == (100, 100, 128, 128)
+    assert W0.shape == (100, 128, 128)
+    assert W1.shape == (100, 128, 1)
 
 def test_basis_generation():
     from dubonnet.layers import BasisGeneration, ExpNormalSmearing
@@ -55,8 +55,5 @@ def test_dubonnet_forward():
     h = torch.nn.functional.one_hot(h, 5).float()
 
     basis = basis_generation(x)
-    K, Q, W0, W1 = parameter_generation(h)
-
-    print(basis.shape, K.shape, Q.shape, W0.shape, W1.shape)
-    
+    K, Q, W0, W1 = parameter_generation(h)    
     Z = dubonnet(basis, (K, Q, W0, W1))

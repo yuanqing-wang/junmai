@@ -134,29 +134,38 @@ class ParameterGeneration(torch.nn.Module):
         self.num_basis = num_basis
         self.fc = torch.nn.Linear(in_features, hidden_features)
         self.attn = torch.nn.MultiheadAttention(hidden_features, num_heads)
-        self.out_features = (
+        self.interaction_out_features = (
             num_rbf * num_basis,
             num_rbf * num_basis,
-            num_basis * num_basis,
-            num_basis * num_basis,
         )
-        self.fc_basis = torch.nn.Linear(2*hidden_features, sum(self.out_features))
+        self.node_out_features = (
+            num_basis * num_basis,
+            num_basis,
+        )
+        self.fc_interaction = torch.nn.Linear(2*hidden_features, sum(self.interaction_out_features))
+        self.fc_node = torch.nn.Linear(hidden_features, sum(self.node_out_features))
 
     def forward(self, h):
         h = self.fc(h)
         h, _ = self.attn(h, h, h)
         n_nodes = int(h.shape[-2])
-        h = torch.cat(
+        h_interaction = torch.cat(
             [
                 h.unsqueeze(-3).repeat_interleave(n_nodes, -3),
                 h.unsqueeze(-2).repeat_interleave(n_nodes, -2),
             ],
             dim=-1
         )
-        h = self.fc_basis(h)
-        K, Q, W0, W1 = torch.split(h, self.out_features, dim=-1)
+        K, Q = torch.split(self.fc_interaction(h_interaction), self.interaction_out_features, dim=-1)
+        W0, W1 = torch.split(self.fc_node(h), self.node_out_features, dim=-1)
+
+        # (N, N, N_rbf, N_basis)
         K = K.reshape(*K.shape[:-1], self.num_rbf, self.num_basis)
+
+        # (N, N, N_rbf, N_basis)
         Q = Q.reshape(*Q.shape[:-1], self.num_rbf, self.num_basis)
+
+        # (N, N_basis)
         W0 = W0.reshape(*W0.shape[:-1], self.num_basis, self.num_basis)
         W1 = W1.reshape(*W1.shape[:-1], self.num_basis, 1)
         return K, Q, W0, W1
