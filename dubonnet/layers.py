@@ -4,6 +4,7 @@ import torch
 NUM_RBF = 50
 CUTOFF_LOWER = 0.0
 CUTOFF_UPPER = 5.0
+EPSILON = 1e-12
 
 class CosineCutoff(torch.nn.Module):
     def __init__(self, cutoff_lower=CUTOFF_LOWER, cutoff_upper=CUTOFF_UPPER):
@@ -114,7 +115,7 @@ class BasisGeneration(torch.nn.Module):
         delta_x_smeared = self.smearing(delta_x_norm)
 
         # (N, N, 3)
-        delta_x_unit = delta_x / delta_x_norm
+        delta_x_unit = delta_x / (delta_x_norm + EPSILON)
 
         # (N, N, 3, N_rbf)
         basis = delta_x_unit.unsqueeze(-1) * delta_x_smeared.unsqueeze(-2)
