@@ -16,6 +16,6 @@ class DubonNet(torch.nn.Module):
         Z = torch.einsum("...ab, ...ab -> ...b", K, Q)
 
         # (N, N_basis)
-        Z = torch.einsum("...ab, ...b -> ...a", W0, Z).tanh()
-        Z = torch.einsum("...ab, ...b -> ...a", W1, Z)
+        Z = torch.einsum("...ba, ...b -> ...a", W0, Z).tanh()
+        Z = torch.einsum("...ba, ...b -> ...a", W1, Z)
         return Z.sum(-2)
