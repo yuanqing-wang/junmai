@@ -142,8 +142,14 @@ class ParameterGeneration(torch.nn.Module):
         self.node_out_features = (
             num_basis * num_basis,
             num_basis,
+            num_basis,
         )
-        self.fc_interaction = torch.nn.Linear(2*hidden_features, sum(self.interaction_out_features))
+        self.fc_interaction = torch.nn.Sequential(
+            torch.nn.Linear(2*hidden_features, hidden_features),
+            torch.nn.Tanh(),
+            torch.nn.Linear(hidden_features, sum(self.interaction_out_features)),
+        )
+        
         self.fc_node = torch.nn.Linear(hidden_features, sum(self.node_out_features))
 
     def forward(self, h):
@@ -158,7 +164,9 @@ class ParameterGeneration(torch.nn.Module):
             dim=-1
         )
         K, Q = torch.split(self.fc_interaction(h_interaction), self.interaction_out_features, dim=-1)
-        W0, W1 = torch.split(self.fc_node(h), self.node_out_features, dim=-1)
+
+        # (N, N, N_rbf, N_basis)
+        W0, B0, W1 = torch.split(self.fc_node(h), self.node_out_features, dim=-1)
 
         # (N, N, N_rbf, N_basis)
         K = K.reshape(*K.shape[:-1], self.num_rbf, self.num_basis)
@@ -168,8 +176,9 @@ class ParameterGeneration(torch.nn.Module):
 
         # (N, N_basis)
         W0 = W0.reshape(*W0.shape[:-1], self.num_basis, self.num_basis)
+        B0 = B0.reshape(*B0.shape[:-1], self.num_basis)
         W1 = W1.reshape(*W1.shape[:-1], self.num_basis, 1)
-        return K, Q, W0, W1
+        return K, Q, W0, B0, W1
     
 
 
