@@ -20,7 +20,7 @@ def run(args):
     E = (E - E_MEAN) / E_STD
     F = F / E_STD
     
-    from sakelite.layers import (
+    from junmai.layers import (
         BasisGeneration, ExpNormalSmearing, ParameterGeneration
     )
 
@@ -34,8 +34,8 @@ def run(args):
         num_heads=1,
     )
 
-    from sakelite.models import SakeLite
-    sakelite = SakeLite()
+    from junmai.models import Junmai
+    junmai = Junmai()
 
     device = torch.device("cpu")
     if torch.cuda.is_available():
@@ -47,7 +47,7 @@ def run(args):
     E_te, F_te, R_te, Z_te = E_te.to(device), F_te.to(device), R_te.to(device), Z_te.to(device)
     basis_generation = basis_generation.to(device)
     parameter_generation = parameter_generation.to(device)
-    sakelite = sakelite.to(device)
+    junmai = junmai.to(device)
 
     optimizer = torch.optim.Adam(
         list(basis_generation.parameters())
@@ -60,7 +60,7 @@ def run(args):
         optimizer.zero_grad()
         basis = basis_generation(R)
         K, Q, W0, B0, W1 = parameter_generation(Z)
-        E_hat = sakelite(basis, (K, Q, W0, B0, W1))
+        E_hat = junmai(basis, (K, Q, W0, B0, W1))
         # loss_energy = torch.nn.L1Loss()(E_hat, E)
         F_hat = -1.0 * torch.autograd.grad(
             E_hat.sum(),
@@ -76,7 +76,7 @@ def run(args):
         loss.backward()
         optimizer.step()
         # with torch.no_grad():
-        #     E_hat_te = sakelite(basis_generation(R_te), (K, Q, W0, W1))
+        #     E_hat_te = junmai(basis_generation(R_te), (K, Q, W0, W1))
         #     E_hat_te = E_hat_te * E_STD + E_MEAN
         #     loss_te = torch.nn.L1Loss()(E_hat_te, E_te)
         #     print(loss_energy.item() * E_STD.item(), loss_te.item())
