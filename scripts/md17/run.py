@@ -21,11 +21,13 @@ def run(args):
     F = F / E_STD
     
     from junmai.layers import (
-        BasisGeneration, ExpNormalSmearing, ParameterGeneration
+        BasisGeneration, ExpNormalSmearing, ParameterGeneration,
+        EuclideanAttention,
     )
 
     smearing = ExpNormalSmearing(num_rbf=args.num_rbf)
-    basis_generation = BasisGeneration(smearing)
+    attention = EuclideanAttention(gamma=1.0)
+    basis_generation = BasisGeneration(smearing, attention)
     parameter_generation = ParameterGeneration(
         in_features=Z.shape[-1],
         hidden_features=args.hidden_features,
@@ -61,7 +63,7 @@ def run(args):
         basis = basis_generation(R)
         K, Q, W0, B0, W1 = parameter_generation(Z)
         E_hat = junmai(basis, (K, Q, W0, B0, W1))
-        # loss_energy = torch.nn.L1Loss()(E_hat, E)
+        loss_energy = torch.nn.L1Loss()(E_hat, E)
         F_hat = -1.0 * torch.autograd.grad(
             E_hat.sum(),
             R,
@@ -69,9 +71,8 @@ def run(args):
         )[0]
 
         loss_force = torch.nn.L1Loss()(F_hat, F)
-        print(loss_force.item())
-        # loss = 0.001 * loss_energy + loss_force
-        loss = loss_force
+        print(loss_energy.item(), loss_force.item(), flush=True)
+        loss = loss_energy + loss_force
 
         loss.backward()
         optimizer.step()

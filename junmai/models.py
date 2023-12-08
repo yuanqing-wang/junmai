@@ -9,10 +9,11 @@ class Junmai(torch.nn.Module):
         # W1.shape = (N, N_basis, 1)
         K, Q, W0, B0, W1 = parameters
 
-        print(K - K.transpose(-3, -4))
+        # (N, N, 3, N_basis)
+        K, Q = torch.matmul(basis, K), torch.matmul(basis, Q)
 
         # (N, 3, N_basis)
-        K, Q = torch.matmul(basis, K).mean(-3), torch.matmul(basis, Q).mean(-3)
+        K, Q = K.mean(-3), Q.mean(-3)
 
         # (N, N_basis)
         Z = torch.einsum("...ab, ...ab -> ...b", K, Q)
