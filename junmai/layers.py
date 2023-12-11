@@ -2,7 +2,7 @@ import math
 import torch
 
 NUM_RBF = 50
-CUTOFF_LOWER = 0.0
+CUTOFF_LOWER = 1e-12
 CUTOFF_UPPER = 5.0
 EPSILON = 1e-12
 
@@ -96,22 +96,34 @@ class ExpNormalSmearing(torch.nn.Module):
             ** 2
         ) * self.cutoff_fn(dist)
     
+    
 class EuclideanAttention(torch.nn.Module):
-    def __init__(self, gamma):
+    def __init__(
+            self, 
+            cutoff_lower=CUTOFF_LOWER,
+            cutoff_upper=CUTOFF_UPPER,
+            num_rbf=NUM_RBF,
+        ):
         super().__init__()
-        self.register_buffer("gamma", torch.tensor(gamma))
-            
+        self.cutoff_lower = cutoff_lower
+        self.cutoff_upper = cutoff_upper
+        self.num_rbf = num_rbf
+        self.register_buffer(
+            "gamma", 
+            torch.linspace(cutoff_lower, cutoff_upper, num_rbf),
+        )
+        
+
+
     def forward(self, dist):
-        return torch.softmax(-self.gamma * dist, -2)
+        return torch.softmax(-dist / self.gamma, -2)
 
 class BasisGeneration(torch.nn.Module):
     def __init__(
         self,
-        smearing,
         attention,
     ):
         super().__init__()
-        self.smearing = smearing
         self.attention = attention
 
     def forward(self, x):
@@ -121,17 +133,12 @@ class BasisGeneration(torch.nn.Module):
         # (N, N, 1)
         delta_x_norm = delta_x.pow(2).relu().sum(dim=-1, keepdim=True)
 
-        # (N, N, 1)
+        # (N, N, N_rbf)
         delta_x_attention = self.attention(delta_x_norm)
 
-        # (N, N, N_rbf)
-        delta_x_smeared = self.smearing(delta_x_norm)
-
         # (N, N, 3, N_rbf)
-        basis = delta_x.unsqueeze(-1) * delta_x_smeared.unsqueeze(-2)
+        basis = delta_x.unsqueeze(-1) * delta_x_attention.unsqueeze(-2)
 
-        # (N, N, 3, N_rbf)
-        basis = basis * delta_x_attention.unsqueeze(-2)
         return basis
 
 class ParameterGeneration(torch.nn.Module):

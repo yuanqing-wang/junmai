@@ -25,9 +25,8 @@ def run(args):
         EuclideanAttention,
     )
 
-    smearing = ExpNormalSmearing(num_rbf=args.num_rbf)
-    attention = EuclideanAttention(gamma=1.0)
-    basis_generation = BasisGeneration(smearing, attention)
+    attention = EuclideanAttention()
+    basis_generation = BasisGeneration(attention)
     parameter_generation = ParameterGeneration(
         in_features=Z.shape[-1],
         hidden_features=args.hidden_features,
@@ -88,8 +87,8 @@ if __name__ == "__main__":
     parser.add_argument("--path", type=str)
     parser.add_argument("--test-path", type=str, default="")
     parser.add_argument("--num-rbf", type=int, default=50)
-    parser.add_argument("--hidden-features", type=int, default=128)
-    parser.add_argument("--lr", type=float, default=1e-5)
+    parser.add_argument("--hidden-features", type=int, default=64)
+    parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--weight-decay", type=float, default=1e-10)
     args = parser.parse_args()
     run(args)
