@@ -96,27 +96,17 @@ class ExpNormalSmearing(torch.nn.Module):
             ** 2
         ) * self.cutoff_fn(dist)
     
-    
-class EuclideanAttention(torch.nn.Module):
-    def __init__(
-            self, 
-            cutoff_lower=CUTOFF_LOWER,
-            cutoff_upper=CUTOFF_UPPER,
-            num_rbf=NUM_RBF,
-        ):
-        super().__init__()
-        self.cutoff_lower = cutoff_lower
-        self.cutoff_upper = cutoff_upper
-        self.num_rbf = num_rbf
-        self.register_buffer(
-            "gamma", 
-            torch.linspace(cutoff_lower, cutoff_upper, num_rbf),
-        )
-        
-
-
+class EuclideanAttention(ExpNormalSmearing):
     def forward(self, dist):
-        return torch.softmax(-dist / self.gamma, -2)
+        return torch.softmax(
+            -self.betas
+            * (
+                torch.exp(self.alpha * (-dist + self.cutoff_lower))
+                - self.means
+            )
+            ** 2,
+            dim=-1,
+        ) * self.cutoff_fn(dist)
 
 class BasisGeneration(torch.nn.Module):
     def __init__(
