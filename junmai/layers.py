@@ -1,7 +1,7 @@
 import math
 import torch
 
-NUM_RBF = 50
+NUM_RBF = 100
 CUTOFF_LOWER = 1e-12
 CUTOFF_UPPER = 5.0
 EPSILON = 1e-12
@@ -105,7 +105,7 @@ class EuclideanAttention(ExpNormalSmearing):
                 - self.means
             )
             ** 2,
-            dim=-1,
+            dim=-2,
         ) * self.cutoff_fn(dist)
 
 class BasisGeneration(torch.nn.Module):
