@@ -45,6 +45,7 @@ def run(args):
         device = torch.device("mps")
 
     E, F, R, Z = E.to(device), F.to(device), R.to(device), Z.to(device)
+    print(E.shape, F.shape, R.shape, Z.shape)
     E_te, F_te, R_te, Z_te = E_te.to(device), F_te.to(device), R_te.to(device), Z_te.to(device)
     basis_generation = basis_generation.to(device)
     parameter_generation = parameter_generation.to(device)
@@ -58,23 +59,31 @@ def run(args):
     )
 
     for i in range(1000000):
-        optimizer.zero_grad()
-        basis = basis_generation(R)
-        K, Q, W0, B0, W1 = parameter_generation(Z)
-        E_hat = junmai(basis, (K, Q, W0, B0, W1))
-        loss_energy = torch.nn.L1Loss()(E_hat, E)
-        F_hat = -1.0 * torch.autograd.grad(
-            E_hat.sum(),
-            R,
-            create_graph=True,
-        )[0]
+        idxs = torch.randperm(E.shape[0])
+        n_batches = E.shape[0] // args.batch_size
+        for idx_batch in range(n_batches):
+            optimizer.zero_grad()
+            idx = idxs[idx_batch * args.batch_size : (idx_batch + 1) * args.batch_size]
+            E_batch = E[idx]
+            F_batch = F[idx]
+            R_batch = R[idx]
+            Z_batch = Z
+            basis = basis_generation(R_batch)
+            K, Q, W0, B0, W1 = parameter_generation(Z_batch)
+            E_hat = junmai(basis, (K, Q, W0, B0, W1))
+            loss_energy = torch.nn.L1Loss()(E_hat, E_batch)
+            F_hat = -1.0 * torch.autograd.grad(
+                E_hat.sum(),
+                R_batch,
+                create_graph=True,
+            )[0]
 
-        loss_force = torch.nn.L1Loss()(F_hat, F)
-        print(loss_energy.item(), loss_force.item(), flush=True)
-        loss = loss_energy + loss_force
+            loss_force = torch.nn.L1Loss()(F_hat, F_batch)
+            print(loss_energy.item(), loss_force.item(), flush=True)
+            loss = 1e-3 * loss_energy + loss_force
 
-        loss.backward()
-        optimizer.step()
+            loss.backward()
+            optimizer.step()
         # with torch.no_grad():
         #     E_hat_te = junmai(basis_generation(R_te), (K, Q, W0, W1))
         #     E_hat_te = E_hat_te * E_STD + E_MEAN
@@ -90,5 +99,6 @@ if __name__ == "__main__":
     parser.add_argument("--hidden-features", type=int, default=128)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--weight-decay", type=float, default=1e-10)
+    parser.add_argument("--batch-size", type=int, default=32)
     args = parser.parse_args()
     run(args)
