@@ -2,7 +2,6 @@ import torch
 
 class Junmai(torch.nn.Module):
     def forward(self, basis, parameters):
-        print(basis)
         # basis.shape = (N, N, 3, N_rbf)
         # K.shape = (N, N, N_rbf, N_basis)
         # Q.shape = (N, N, N_rbf, N_basis)

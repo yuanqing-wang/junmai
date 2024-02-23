@@ -94,7 +94,7 @@ class ExpNormalSmearing(torch.nn.Module):
                 - self.means
             )
             ** 2
-        ) * self.cutoff_fn(dist)
+        ) # * self.cutoff_fn(dist)
     
 class EuclideanAttention(ExpNormalSmearing):
     def forward(self, dist):
@@ -121,7 +121,7 @@ class BasisGeneration(torch.nn.Module):
         delta_x = x[..., None, :, :] - x[..., :, None, :]
 
         # (N, N, 1)
-        delta_x_norm = delta_x.pow(2).relu().sum(dim=-1, keepdim=True)
+        delta_x_norm = (EPSILON + delta_x.pow(2).relu().sum(dim=-1, keepdim=True)).pow(0.5)
 
         # (N, N, N_rbf)
         delta_x_attention = self.attention(delta_x_norm)

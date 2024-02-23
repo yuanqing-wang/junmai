@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --time=11:59:00
+#SBATCH --time=7:59:00
 #SBATCH --mem=5GB
 #SBATCH --job-name=tune
 #SBATCH --output=%A.out
