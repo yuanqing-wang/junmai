@@ -1,26 +1,26 @@
 import torch
+from .layers import JunmaiLayer
 
-class Junmai(torch.nn.Module):
-    def forward(self, basis, parameters):
-        # basis.shape = (N, N, 3, N_rbf)
-        # K.shape = (N, N, N_rbf, N_basis)
-        # Q.shape = (N, N, N_rbf, N_basis)
-        # W0.shape = (N, N_basis, N_basis)
-        # W1.shape = (N, N_basis, 1)
-        K, Q, W0, B0, W1 = parameters
+class JunmaiModel(torch.nn.Module):
+    def __init__(
+        self,
+        in_features: int,
+        hidden_features: int,
+        depth: int,
+        activation: torch.nn.Module = torch.nn.SiLU(),
+    ):
+        super().__init__()
+        self.layers = torch.nn.ModuleList(
+            [
+                JunmaiLayer(
+                    in_features if i == 0 else hidden_features,
+                    hidden_features if i < depth - 1 else 1,
+                )
+                for i in range(depth)
+            ]
+        )
 
-        # (N, N, 3, N_basis)
-        K, Q = torch.matmul(basis, K), torch.matmul(basis, Q)
-
-        # (N, 3, N_basis)
-        K, Q = K.mean(-3), Q.mean(-3)
-
-        # (N, N_basis)
-        Z = torch.einsum("...ab, ...ab -> ...b", K, Q)
-
-        # (N, N_basis)
-        Z = torch.einsum("...ba, ...b -> ...a", W0, Z)
-        Z = Z + B0
-        Z = Z.sigmoid()
-        Z = torch.einsum("...ba, ...b -> ...a", W1, Z)
-        return Z.sum(-2)
+    def forward(self, h, x):
+        for layer in self.layers:
+            h = layer(h, x)
+        return h

@@ -1,2 +1,2 @@
 # junmai
-Dot product-based one layer network.
+Just a uni-layer neural network can model _ab initio_ calculations.
