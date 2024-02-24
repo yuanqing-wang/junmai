@@ -20,57 +20,11 @@ def run(args):
     E = (E - E_MEAN) / E_STD
     F = F / E_STD
     
-    from junmai.layers import (
-        BasisGeneration, ExpNormalSmearing, ParameterGeneration,
-        EuclideanAttention,
-    )
-
-    attention = EuclideanAttention()
-    basis_generation = BasisGeneration(attention)
-    parameter_generation = ParameterGeneration(
+    from junmai.models import JunmaiModel
+    model = JunmaiModel(
         in_features=Z.shape[-1],
         hidden_features=args.hidden_features,
-        num_rbf=args.num_rbf,
-        num_basis=args.hidden_features,
-        num_heads=1,
-    )
-
-    from junmai.models import Junmai
-    junmai = Junmai()
-
-    device = torch.device("cpu")
-    if torch.cuda.is_available():
-        device = torch.device("cuda")
-    elif torch.backends.mps.is_available():
-        device = torch.device("mps")
-
-    E, F, R, Z = E.to(device), F.to(device), R.to(device), Z.to(device)
-    print(E.shape, F.shape, R.shape, Z.shape)
-    E_te, F_te, R_te, Z_te = E_te.to(device), F_te.to(device), R_te.to(device), Z_te.to(device)
-    basis_generation = basis_generation.to(device)
-    # parameter_generation = parameter_generation.to(device)
-    junmai = junmai.to(device)
-
-
-    class Container(torch.nn.Module):
-        def __init__(self):
-            super().__init__()
-            self.K = torch.nn.Parameter(torch.randn(1, 9, 9, 100, 128))
-            self.Q = torch.nn.Parameter(torch.randn(1, 9, 9, 100, 128))
-            self.W0 = torch.nn.Parameter(torch.randn(1, 9, 128, 128))
-            self.B0 = torch.nn.Parameter(torch.randn(1, 9, 128))
-            self.W1 = torch.nn.Parameter(torch.randn(1, 9, 128, 1))
-    
-    container = Container()
-    if torch.cuda.is_available():
-        container = container.cuda()
-
-    optimizer = torch.optim.Adam(
-        list(basis_generation.parameters())
-        # + list(parameter_generation.parameters()),
-        + list(container.parameters()),
-        lr=args.lr,
-        weight_decay=args.weight_decay,
+        depth=args.depth,
     )
 
     for i in range(1000000):
@@ -84,40 +38,27 @@ def run(args):
             F_batch = F[idx]
             R_batch = R[idx]
             Z_batch = Z
-            basis = basis_generation(R_batch)
-            # K, Q, W0, B0, W1 = parameter_generation(Z_batch)
-            # print(K.shape, Q.shape, W0.shape, B0.shape, W1.shape, flush=True)
+            E_hat = model(Z_batch, R_batch)
 
-            K, Q, W0, B0, W1 = container.K, container.Q, container.W0, container.B0, container.W1
-            E_hat = junmai(basis, (K, Q, W0, B0, W1))
+
             loss_energy = torch.nn.L1Loss()(E_hat, E_batch)
-            F_hat = -1.0 * torch.autograd.grad(
-                E_hat.sum(),
-                R_batch,
-                create_graph=True,
-            )[0]
+            # F_hat = -1.0 * torch.autograd.grad(
+            #     E_hat.sum(),
+            #     R_batch,
+            #     create_graph=True,
+            # )[0]
 
-            loss_force = torch.nn.L1Loss()(F_hat, F_batch)
-            print(loss_energy.item(), loss_force.item(), flush=True)
-            loss = 1e-3 * loss_energy + loss_force
-
-            # loss = loss_energy
-            # print(loss * E_STD, flush=True)
-
+            # loss_force = torch.nn.L1Loss()(F_hat, F_batch)    
+            loss = loss_energy
             loss.backward()
             optimizer.step()
-        
-        # with torch.no_grad():
-        #     # K, Q, W0, B0, W1 = parameter_generation(Z_te)
-        #     E_hat_te = junmai(basis_generation(R_te), (K, Q, W0, B0, W1))
-        #     E_hat_te = E_hat_te * E_STD + E_MEAN
-        #     loss_te = torch.nn.L1Loss()(E_hat_te, E_te)
-        #     print(loss_energy.item() * E_STD.item(), loss_te.item(), flush=True)
+    
 
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Run MD simulation")
     parser.add_argument("--path", type=str)
+    parser.add_argument("--depth", type=int, default=3)
     parser.add_argument("--test-path", type=str, default="")
     parser.add_argument("--num-rbf", type=int, default=100)
     parser.add_argument("--hidden-features", type=int, default=128)
