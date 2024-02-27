@@ -6,6 +6,7 @@ from .utils import (
     get_h_cat_ht,
     get_x_minus_xt,
     get_x_minus_xt_norm,
+    EPSILON,
 )
 
 class JunmaiLayer(torch.nn.Module):
@@ -25,7 +26,7 @@ class JunmaiLayer(torch.nn.Module):
         self.parameter_dimensions = (
             num_coefficients,
             num_coefficients,
-            num_rbf,
+            # num_rbf,
         )
 
         self.fc_node = torch.nn.Linear(
@@ -37,9 +38,13 @@ class JunmaiLayer(torch.nn.Module):
             num_rbf, num_coefficients, bias=False
         )
 
-        self.fc_summary = torch.nn.Linear(
-            num_coefficients, out_features
+        self.fc_summary = torch.nn.Sequential(
+            torch.nn.Linear(num_coefficients, num_coefficients),
+            torch.nn.Tanh(),
+            torch.nn.Linear(num_coefficients, out_features),
         )
+
+        # self.fc_summary = torch.nn.Linear(num_coefficients, out_features)
 
     def forward(
         self,
@@ -49,7 +54,7 @@ class JunmaiLayer(torch.nn.Module):
         # (N, N, 2D)
         h_cat_ht = get_h_cat_ht(h)
         parameters = self.fc_node(h_cat_ht)
-        K, Q, C = parameters.split(self.parameter_dimensions, dim=-1)
+        K, Q = parameters.split(self.parameter_dimensions, dim=-1)
 
         # (N, N, 3)
         x_minus_xt = get_x_minus_xt(x)
@@ -57,9 +62,12 @@ class JunmaiLayer(torch.nn.Module):
         # (N, N, 1)
         x_minus_xt_norm = get_x_minus_xt_norm(x_minus_xt)
 
+        # (N, N, 3)
+        x_minus_xt = x_minus_xt / (x_minus_xt_norm ** 2 + EPSILON)
+
         # (N, N, N_RBF)
         x_minus_xt_smear = self.smearing(x_minus_xt_norm)
-        x_minus_xt_smear = x_minus_xt_smear * C
+        # x_minus_xt_smear = x_minus_xt_smear * C
 
         # (N, N, N_COEFFICIENTS)
         x_minus_xt_basis = self.fc_basis(x_minus_xt_smear)
@@ -81,10 +89,16 @@ class JunmaiLayer(torch.nn.Module):
         h = self.fc_summary(h)
         return h
 
+class GaussianDropout(torch.nn.Module):
+    def __init__(self, sigma: float):
+        super().__init__()
+        self.sigma = sigma
 
-
-
-
+    def forward(self, x: torch.Tensor):
+        if self.training:
+            x = x + torch.randn_like(x) * self.sigma
+        else:
+            return x
 
 
 

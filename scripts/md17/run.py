@@ -19,6 +19,8 @@ def run(args):
     E_te, F_te, R_te, Z_te = get_data(data_te)
     E = (E - E_MEAN) / E_STD
     F = F / E_STD
+    E_te = (E_te - E_MEAN) / E_STD
+    F_te = F_te / E_STD
     
     from junmai.models import JunmaiModel
     model = JunmaiModel(
@@ -27,31 +29,75 @@ def run(args):
         depth=args.depth,
     )
 
+    if torch.cuda.is_available():
+        model = model.cuda()
+        E = E.cuda()
+        F = F.cuda()
+        R = R.cuda()
+        Z = Z.cuda()
+        E_te = E_te.cuda()
+        F_te = F_te.cuda()
+        R_te = R_te.cuda()
+        Z_te = Z_te.cuda()
+
+    R.requires_grad_(True)
+    R_te.requires_grad_(True)
+
+    optimizer = torch.optim.Adam(
+        model.parameters(),
+        lr=args.lr,
+        weight_decay=args.weight_decay,
+    )
+
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer,
+        mode="min",
+        factor=0.5,
+        patience=1000,
+        verbose=True,
+    )
+
     for i in range(1000000):
         idxs = torch.randperm(E.shape[0])
         batch_size = args.batch_size if args.batch_size > 0 else E.shape[0]
         n_batches = E.shape[0] // batch_size
         for idx_batch in range(n_batches):
+            model.train()
             optimizer.zero_grad()
             idx = idxs[idx_batch * batch_size : (idx_batch + 1) * batch_size]
             E_batch = E[idx]
             F_batch = F[idx]
             R_batch = R[idx]
             Z_batch = Z
-            E_hat = model(Z_batch, R_batch)
 
+            E_hat, h_last = model(Z_batch, R_batch)
+            h_last_var = h_last.var(dim=0).mean()
 
             loss_energy = torch.nn.L1Loss()(E_hat, E_batch)
-            # F_hat = -1.0 * torch.autograd.grad(
-            #     E_hat.sum(),
-            #     R_batch,
-            #     create_graph=True,
-            # )[0]
+            F_hat = -1.0 * torch.autograd.grad(
+                E_hat.sum(),
+                R_batch,
+                create_graph=True,
+            )[0]
 
-            # loss_force = torch.nn.L1Loss()(F_hat, F_batch)    
-            loss = loss_energy
+            loss_force = torch.nn.L1Loss()(F_hat, F_batch)     
+            loss = 0.01 * loss_energy + loss_force + h_last_var * 100
             loss.backward()
+            loss_energy = loss_energy.item() * E_STD
+            loss_force = loss_force.item() * E_STD
+            scheduler.step(loss_energy)
             optimizer.step()
+
+            model.eval()
+            E_te_hat, _ = model(Z_te, R_te)
+            F_te_hat = -1.0 * torch.autograd.grad(
+                E_te_hat.sum(),
+                R_te,
+                create_graph=True,
+            )[0]
+            loss_energy_te = torch.nn.L1Loss()(E_te_hat, E_te).item() * E_STD
+            loss_force_te = torch.nn.L1Loss()(F_te_hat, F_te).item() * E_STD
+            print(loss_energy, loss_force, loss_energy_te, loss_force_te, h_last_var, flush=True)
     
 
 if __name__ == "__main__":
@@ -61,9 +107,9 @@ if __name__ == "__main__":
     parser.add_argument("--depth", type=int, default=3)
     parser.add_argument("--test-path", type=str, default="")
     parser.add_argument("--num-rbf", type=int, default=100)
-    parser.add_argument("--hidden-features", type=int, default=128)
-    parser.add_argument("--lr", type=float, default=1e-5)
+    parser.add_argument("--hidden-features", type=int, default=64)
+    parser.add_argument("--lr", type=float, default=1e-2)
     parser.add_argument("--weight-decay", type=float, default=1e-10)
-    parser.add_argument("--batch-size", type=int, default=32)
+    parser.add_argument("--batch-size", type=int, default=-1)
     args = parser.parse_args()
     run(args)

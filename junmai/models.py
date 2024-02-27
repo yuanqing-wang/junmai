@@ -21,6 +21,11 @@ class JunmaiModel(torch.nn.Module):
         )
 
     def forward(self, h, x):
-        for layer in self.layers:
+        for idx, layer in enumerate(self.layers):
             h = layer(h, x)
-        return h
+            if idx == len(self.layers) - 2:
+                h_last = h
+            if idx < len(self.layers) - 1:
+                h = torch.nn.SiLU()(h)
+        h = h.sum(-2)
+        return h, h_last

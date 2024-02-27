@@ -162,3 +162,5 @@ cython_debug/
 # data
 *.npz
 *.zip
+
+*.out
