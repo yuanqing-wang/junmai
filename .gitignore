@@ -164,3 +164,7 @@ cython_debug/
 *.zip
 
 *.out
+
+*.db
+*.txt
+*.tar.gz

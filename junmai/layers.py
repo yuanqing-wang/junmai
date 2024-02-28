@@ -90,13 +90,13 @@ class JunmaiLayer(torch.nn.Module):
         return h
 
 class GaussianDropout(torch.nn.Module):
-    def __init__(self, sigma: float):
+    def __init__(self, alpha: float):
         super().__init__()
-        self.sigma = sigma
+        self.alpha = alpha
 
     def forward(self, x: torch.Tensor):
         if self.training:
-            x = x + torch.randn_like(x) * self.sigma
+            x = x + torch.randn_like(x) * self.alpha
         else:
             return x
 

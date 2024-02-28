@@ -1,0 +1,63 @@
+ISO-17
+======
+
+The molecules were randomly drawn from the largest set of isomers in the QM9 dataset [1] which consists of molecules with a fixed composition of atoms (C7O2H10) arranged in different chemically valid structures. It is an extension of the ismoer MD data used in [2].
+The database was generated from molecular dynamics simulations using the Fritz-Haber Institute ab initio simulation package (FHI-aims)[3].
+The simulations were carried out using the standard quantum chemistry computational method density functional theory (DFT) in the generalized gradient approximation (GGA) with the Perdew-Burke-Ernzerhof (PBE) functional[4] and the Tkatchenko-Scheffler (TS) van der Waals correction method [5].
+The database consist of 129 molecules each containing 5,000 conformational geometries, energies and forces with a resolution of 1 femtosecond in the molecular dynamics trajectories.
+
+If you use this data, please cite the following papers:
+
+K.T. Schütt, P.-J. Kindermans, H.E. Sauceda, S. Chmiela, A. Tkatchenko, K.-R. Müller. SchNet: A continuous-filter convolutional neural network for modeling quantum interactions. Advances in Neural Information Processing System. 2017.
+
+K.T. Schütt, F. Arbabzadah, S. Chmiela, K.R. Müller, A. Tkatchenko. Quantum-chemical insights from deep tensor neural networks. Nature Communications, 8, 13890. 2017.
+
+R. Ramakrishnan, P. O. Dral, M. Rupp, and O. A. von Lilienfeld. Quantum chemistry structures
+and properties of 134 kilo molecules. Scientific Data, 1, 2014.
+
+Format
+------
+The data is stored in ASE sqlite format with the total energy in eV under the key `total energy` and the atomic_forces under the key `atomic_forces` in eV/Ang. 
+
+The following Python snippet iterates over the first 10 entries of the dataset located at `path_to_db`:
+
+> from ase.db import connect
+> 
+> with connect(path_to_db) as conn:
+>     for row in conn.select(limit=10):
+>         print(row.toatoms())
+>         print(row['total_energy'])
+>         print(row.data['atomic_forces'])
+
+Partitions
+----------
+The data is partitioned as used in the SchNet paper [6] (arXiv:1706.08566):
+
+reference.db       - 80% of steps of 80% of MD trajectories
+reference_eq.db    - equilibrium conformations of those molecules
+test_with.db       - remaining 20% unseen steps of reference trajectories
+test_other.db      - remaining 20% unseen MD trajectories
+test_eq.db         - equilibrium conformations of test trajectories
+
+In the paper, we split the reference data (reference.db) into 400k training examples and 4k validation examples. The indices are given in the files train_ids.txt and validation_idx.txt, respectively.
+
+
+References
+----------
+
+[1] R. Ramakrishnan, P. O. Dral, M. Rupp, and O. A. von Lilienfeld. Quantum chemistry structures
+and properties of 134 kilo molecules. Scientific Data, 1, 2014.
+
+[2] Schütt, K. T., Arbabzadah, F., Chmiela, S., Müller, K. R., & Tkatchenko, A. (2017). Quantum-chemical insights from deep tensor neural networks. Nature Communications, 8, 13890.
+
+[3] Blum, V.; Gehrke, R.; Hanke, F.; Havu, P.; Havu, V.; Ren, X.; Reuter, K.; Scheffler, M.
+Ab Initio Molecular Simulations with Numeric Atom-Centered Orbitals. Comput. Phys.
+Commun. 2009, 180 (11), 2175–2196.
+
+[4] Perdew, J. P.; Burke, K.; Ernzerhof, M. Generalized Gradient Approximation Made
+Simple. Phys. Rev. Lett. 1996, 77 (18), 3865–3868.
+
+[5] Tkatchenko, A.; Scheffler, M. Accurate Molecular Van Der Waals Interactions from
+Ground-State Electron Density and Free-Atom Reference Data. Phys. Rev. Lett. 2009, 102 (7), 73005.
+
+[6] Schütt, K. T., Kindermans, P. J., Sauceda, H. E., Chmiela, S., Tkatchenko, A., & Müller, K. R. SchNet: A continuous-filter convolutional neural network for modeling quantum interactions. Advances in Neural Information Processing System (accepted). 2017.

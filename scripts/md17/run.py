@@ -47,6 +47,7 @@ def run(args):
         model.parameters(),
         lr=args.lr,
         weight_decay=args.weight_decay,
+        alpha=args.alpha,
     )
 
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
@@ -111,5 +112,6 @@ if __name__ == "__main__":
     parser.add_argument("--lr", type=float, default=1e-2)
     parser.add_argument("--weight-decay", type=float, default=1e-10)
     parser.add_argument("--batch-size", type=int, default=-1)
+    parser.add_argument("--alpha", type=float, default=0.1)
     args = parser.parse_args()
     run(args)

@@ -1,5 +1,5 @@
 import torch
-from .layers import JunmaiLayer
+from .layers import JunmaiLayer, GaussianDropout
 
 class JunmaiModel(torch.nn.Module):
     def __init__(
@@ -7,6 +7,7 @@ class JunmaiModel(torch.nn.Module):
         in_features: int,
         hidden_features: int,
         depth: int,
+        alpha: float = 1.0,
         activation: torch.nn.Module = torch.nn.SiLU(),
     ):
         super().__init__()
@@ -20,12 +21,16 @@ class JunmaiModel(torch.nn.Module):
             ]
         )
 
+        self.activation = activation
+        self.gaussian_dropout = GaussianDropout(alpha=alpha)
+
     def forward(self, h, x):
         for idx, layer in enumerate(self.layers):
             h = layer(h, x)
             if idx == len(self.layers) - 2:
                 h_last = h
             if idx < len(self.layers) - 1:
-                h = torch.nn.SiLU()(h)
+                h = self.activation(h)
+        h = self.gaussian_dropout(h)
         h = h.sum(-2)
         return h, h_last
