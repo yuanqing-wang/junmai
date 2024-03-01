@@ -40,7 +40,7 @@ class JunmaiLayer(torch.nn.Module):
 
         self.fc_summary = torch.nn.Sequential(
             torch.nn.Linear(num_coefficients, num_coefficients),
-            torch.nn.Tanh(),
+            torch.nn.ELU(),
             torch.nn.Linear(num_coefficients, out_features),
         )
 
@@ -97,8 +97,7 @@ class GaussianDropout(torch.nn.Module):
     def forward(self, x: torch.Tensor):
         if self.training:
             x = x + torch.randn_like(x) * self.alpha
-        else:
-            return x
+        return x
 
 
 

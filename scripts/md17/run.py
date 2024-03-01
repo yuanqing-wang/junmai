@@ -21,12 +21,15 @@ def run(args):
     F = F / E_STD
     E_te = (E_te - E_MEAN) / E_STD
     F_te = F_te / E_STD
+    Z = torch.randn_like(Z)
+    Z_te = torch.randn_like(Z_te)
     
     from junmai.models import JunmaiModel
     model = JunmaiModel(
         in_features=Z.shape[-1],
         hidden_features=args.hidden_features,
         depth=args.depth,
+        alpha=args.alpha,
     )
 
     if torch.cuda.is_available():
@@ -40,14 +43,13 @@ def run(args):
         R_te = R_te.cuda()
         Z_te = Z_te.cuda()
 
-    R.requires_grad_(True)
-    R_te.requires_grad_(True)
+    # R.requires_grad_(True)
+    # R_te.requires_grad_(True)
 
     optimizer = torch.optim.Adam(
         model.parameters(),
         lr=args.lr,
         weight_decay=args.weight_decay,
-        alpha=args.alpha,
     )
 
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
@@ -72,7 +74,7 @@ def run(args):
             Z_batch = Z
 
             E_hat, h_last = model(Z_batch, R_batch)
-            h_last_var = h_last.var(dim=0).mean()
+            # h_last_var = h_last.var(dim=0).mean()
 
             loss_energy = torch.nn.L1Loss()(E_hat, E_batch)
             F_hat = -1.0 * torch.autograd.grad(
@@ -81,34 +83,33 @@ def run(args):
                 create_graph=True,
             )[0]
 
-            loss_force = torch.nn.L1Loss()(F_hat, F_batch)     
-            loss = 0.01 * loss_energy + loss_force + h_last_var * 100
+            loss_force = torch.nn.MSELoss()(F_hat, F_batch)     
+            loss = 0.001 * loss_energy + loss_force
             loss.backward()
-            loss_energy = loss_energy.item() * E_STD
-            loss_force = loss_force.item() * E_STD
             scheduler.step(loss_energy)
+            print(E_STD * loss_energy.item(), loss_force, flush=True)
             optimizer.step()
 
-            model.eval()
-            E_te_hat, _ = model(Z_te, R_te)
-            F_te_hat = -1.0 * torch.autograd.grad(
-                E_te_hat.sum(),
-                R_te,
-                create_graph=True,
-            )[0]
-            loss_energy_te = torch.nn.L1Loss()(E_te_hat, E_te).item() * E_STD
-            loss_force_te = torch.nn.L1Loss()(F_te_hat, F_te).item() * E_STD
-            print(loss_energy, loss_force, loss_energy_te, loss_force_te, h_last_var, flush=True)
+            # model.eval()
+            # E_te_hat, _ = model(Z_te, R_te)
+            # F_te_hat = -1.0 * torch.autograd.grad(
+            #     E_te_hat.sum(),
+            #     R_te,
+            #     create_graph=True,
+            # )[0]
+            # loss_energy_te = torch.nn.L1Loss()(E_te_hat, E_te).item() * E_STD
+            # loss_force_te = torch.nn.L1Loss()(F_te_hat, F_te).item() * E_STD
+            # print(loss_energy, loss_force, loss_energy_te, loss_force_te, h_last_var, flush=True)
     
 
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Run MD simulation")
     parser.add_argument("--path", type=str)
-    parser.add_argument("--depth", type=int, default=3)
+    parser.add_argument("--depth", type=int, default=2)
     parser.add_argument("--test-path", type=str, default="")
     parser.add_argument("--num-rbf", type=int, default=100)
-    parser.add_argument("--hidden-features", type=int, default=64)
+    parser.add_argument("--hidden-features", type=int, default=16)
     parser.add_argument("--lr", type=float, default=1e-2)
     parser.add_argument("--weight-decay", type=float, default=1e-10)
     parser.add_argument("--batch-size", type=int, default=-1)

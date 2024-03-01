@@ -25,12 +25,13 @@ class JunmaiModel(torch.nn.Module):
         self.gaussian_dropout = GaussianDropout(alpha=alpha)
 
     def forward(self, h, x):
+        h_last = None
         for idx, layer in enumerate(self.layers):
             h = layer(h, x)
             if idx == len(self.layers) - 2:
                 h_last = h
             if idx < len(self.layers) - 1:
                 h = self.activation(h)
-        h = self.gaussian_dropout(h)
+        # h = self.gaussian_dropout(h)
         h = h.sum(-2)
         return h, h_last
