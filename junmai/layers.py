@@ -26,7 +26,7 @@ class JunmaiLayer(torch.nn.Module):
         self.parameter_dimensions = (
             num_coefficients,
             num_coefficients,
-            # num_rbf,
+            num_rbf,
         )
 
         self.fc_node = torch.nn.Linear(
@@ -39,8 +39,9 @@ class JunmaiLayer(torch.nn.Module):
         )
 
         self.fc_summary = torch.nn.Sequential(
+            torch.nn.SiLU(),
             torch.nn.Linear(num_coefficients, num_coefficients),
-            torch.nn.ELU(),
+            torch.nn.SiLU(),
             torch.nn.Linear(num_coefficients, out_features),
         )
 
@@ -54,7 +55,7 @@ class JunmaiLayer(torch.nn.Module):
         # (N, N, 2D)
         h_cat_ht = get_h_cat_ht(h)
         parameters = self.fc_node(h_cat_ht)
-        K, Q = parameters.split(self.parameter_dimensions, dim=-1)
+        K, Q, C = parameters.split(self.parameter_dimensions, dim=-1)
 
         # (N, N, 3)
         x_minus_xt = get_x_minus_xt(x)
@@ -67,7 +68,7 @@ class JunmaiLayer(torch.nn.Module):
 
         # (N, N, N_RBF)
         x_minus_xt_smear = self.smearing(x_minus_xt_norm)
-        # x_minus_xt_smear = x_minus_xt_smear * C
+        x_minus_xt_smear = x_minus_xt_smear * C
 
         # (N, N, N_COEFFICIENTS)
         x_minus_xt_basis = self.fc_basis(x_minus_xt_smear)

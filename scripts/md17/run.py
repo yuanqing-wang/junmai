@@ -13,6 +13,8 @@ def get_data(data):
 def run(args):
     data = np.load(args.path)
     E, F, R, Z = get_data(data)
+    E, F, R = E[:100], F[:100], R[:100] 
+
     R.requires_grad_(True)
     E_MEAN, E_STD = E.mean(), E.std()
     data_te = np.load(args.test_path)
@@ -84,10 +86,9 @@ def run(args):
             )[0]
 
             loss_force = torch.nn.MSELoss()(F_hat, F_batch)     
-            loss = 0.001 * loss_energy + loss_force
+            loss = loss_force
+            print(E_STD * (loss ** 0.5))
             loss.backward()
-            scheduler.step(loss_energy)
-            print(E_STD * loss_energy.item(), loss_force, flush=True)
             optimizer.step()
 
             # model.eval()
@@ -105,12 +106,12 @@ def run(args):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Run MD simulation")
-    parser.add_argument("--path", type=str)
+    parser.add_argument("--path", type=str, default="ethanol_ccsd_t-train.npz")
     parser.add_argument("--depth", type=int, default=2)
-    parser.add_argument("--test-path", type=str, default="")
+    parser.add_argument("--test-path", type=str, default="ethanol_ccsd_t-train.npz")
     parser.add_argument("--num-rbf", type=int, default=100)
     parser.add_argument("--hidden-features", type=int, default=16)
-    parser.add_argument("--lr", type=float, default=1e-2)
+    parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--weight-decay", type=float, default=1e-10)
     parser.add_argument("--batch-size", type=int, default=-1)
     parser.add_argument("--alpha", type=float, default=0.1)
