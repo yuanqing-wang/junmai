@@ -10,39 +10,34 @@ def get_data(data):
     return E, F, R, Z
 
 class Model(torch.nn.Module):
-    def __init__(self, in_features, hidden_features, n_basis=16):
+    def __init__(self, in_features, hidden_features):
         super().__init__()
         self.fc = torch.nn.Sequential(
-            torch.nn.Linear(n_basis * (in_features ** 2), hidden_features),
+            torch.nn.Linear(in_features, hidden_features),
             torch.nn.SiLU(),
             torch.nn.Linear(hidden_features, 1),
         )
 
-        self.K = torch.nn.Parameter(torch.randn(in_features, in_features, n_basis))
-        self.Q = self.K
-        # self.Q = torch.nn.Parameter(1e-3 * torch.randn(in_features, in_features, n_basis))
-    
     def forward(self, x):
         delta_x = x.unsqueeze(-2) - x.unsqueeze(-3)
-        delta_x = delta_x.unsqueeze(-2)
-        k = self.K.unsqueeze(-1) * delta_x
-        q = self.Q.unsqueeze(-1) * delta_x
-        xxt = torch.einsum("...ij,...ij->...i", k, q)
-        xxt = xxt.flatten(-3, -1)
-        return self.fc(xxt)
+        delta_x_norm = delta_x.pow(2).sum(-1, keepdims=True)
+        delta_x = delta_x / (delta_x_norm + 1e-6)
+        delta_x = torch.einsum("...abc, ...dec -> ...abde", delta_x, delta_x)
+        delta_x = delta_x.flatten(-4, -1)
+        return self.fc(delta_x)
 
 def run():
     data = np.load("ethanol_ccsd_t-train.npz")
     E, F, R, Z = get_data(data)
-    E, F, R = E[:100], F[:100], R[:100] 
-    R.requires_grad_(True)
+    E, F, R = E[:100], F[:100], R[:100]
+    R.requires_grad = True
     E_MEAN, E_STD = E.mean(), E.std()
     E = (E - E_MEAN) / E_STD
     F = F / E_STD
 
     model = Model(
-        in_features=Z.shape[-2],
-        hidden_features=16,
+        in_features=Z.shape[-2] ** 4,
+        hidden_features=32,
     )
 
     optimizer = torch.optim.Adam(
@@ -65,8 +60,8 @@ def run():
         F_pred = torch.autograd.grad(-E_pred.sum(), R, create_graph=True)[0]
         loss = torch.nn.functional.mse_loss(F_pred, F)
         loss.backward()
-        optimizer.step()
         scheduler.step(loss)
+        optimizer.step()
         print(loss.item())
 
 
