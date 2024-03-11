@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+from junmai.layers import ExpNormalSmearing
 
 def get_data(data):
     E, F, R, Z = data["E"], data["F"], data["R"], data["z"]
@@ -12,18 +13,30 @@ def get_data(data):
 class Model(torch.nn.Module):
     def __init__(self, in_features, hidden_features):
         super().__init__()
+
         self.fc = torch.nn.Sequential(
-            torch.nn.Linear(in_features, hidden_features),
+            # torch.nn.Linear(in_features, hidden_features),
             torch.nn.SiLU(),
             torch.nn.Linear(hidden_features, 1),
+        )
+
+        self.smearing = ExpNormalSmearing()
+        self.after_smearing = torch.nn.Linear(self.smearing.num_rbf, hidden_features)
+        self.W = torch.nn.Parameter(
+            torch.randn(
+                9, 9, 9, 9, hidden_features, hidden_features,
+            ),
         )
 
     def forward(self, x):
         delta_x = x.unsqueeze(-2) - x.unsqueeze(-3)
         delta_x_norm = delta_x.pow(2).sum(-1, keepdims=True)
+        delta_x_norm_smeared = self.smearing(delta_x_norm)
+        delta_x_norm_smeared = self.after_smearing(delta_x_norm_smeared)
         delta_x = delta_x / (delta_x_norm + 1e-6)
-        delta_x = torch.einsum("...abc, ...dec -> ...abde", delta_x, delta_x)
-        delta_x = delta_x.flatten(-4, -1)
+        delta_x = delta_x.unsqueeze(-2) * delta_x_norm_smeared.unsqueeze(-1)
+        print(delta_x.shape)
+        delta_x = torch.einsum("...abkc, ...dekc, abdeko -> ...o", delta_x, delta_x, self.W)
         return self.fc(delta_x)
 
 def run():
@@ -36,7 +49,7 @@ def run():
     F = F / E_STD
 
     model = Model(
-        in_features=Z.shape[-2] ** 4,
+        in_features=(Z.shape[-2] ** 4) * 32,
         hidden_features=32,
     )
 
@@ -51,6 +64,13 @@ def run():
         factor=0.5,
         patience=100,
     )
+
+    if torch.cuda.is_available():
+        model = model.cuda()
+        E = E.cuda()
+        F = F.cuda()
+        R = R.cuda()
+        Z = Z.cuda()
 
     for i in range(100000):
         optimizer.zero_grad()

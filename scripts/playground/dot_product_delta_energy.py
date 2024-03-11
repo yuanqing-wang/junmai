@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+from junmai.layers import ExpNormalSmearing
 
 def get_data(data):
     E, F, R, Z = data["E"], data["F"], data["R"], data["z"]
@@ -21,6 +22,7 @@ class Model(torch.nn.Module):
         self.K = torch.nn.Parameter(torch.randn(in_features, in_features, n_basis))
         self.Q = self.K
         # self.Q = torch.nn.Parameter(1e-3 * torch.randn(in_features, in_features, n_basis))
+        # self.smearing = ExpNormalSmearing()
     
     def forward(self, x):
         delta_x = x.unsqueeze(-2) - x.unsqueeze(-3)
@@ -56,6 +58,13 @@ def run():
         factor=0.5,
         patience=100,
     )
+
+    if torch.cuda.is_available():
+        model = model.cuda()
+        E = E.cuda()
+        F = F.cuda()
+        R = R.cuda()
+        Z = Z.cuda()
 
     for i in range(100000):
         optimizer.zero_grad()

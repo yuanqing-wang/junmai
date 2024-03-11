@@ -1,3 +1,4 @@
+from typing import Optional
 import torch
 from .layers import JunmaiLayer, GaussianDropout
 
@@ -9,6 +10,8 @@ class JunmaiModel(torch.nn.Module):
         depth: int,
         alpha: float = 1.0,
         activation: torch.nn.Module = torch.nn.SiLU(),
+        num_coefficients: Optional[int] = None,
+        num_rbf: Optional[int] = None,
     ):
         super().__init__()
         self.layers = torch.nn.ModuleList(
@@ -16,6 +19,8 @@ class JunmaiModel(torch.nn.Module):
                 JunmaiLayer(
                     in_features if i == 0 else hidden_features,
                     hidden_features if i < depth - 1 else 1,
+                    num_coefficients=num_coefficients,
+                    num_rbf=num_rbf,
                 )
                 for i in range(depth)
             ]
