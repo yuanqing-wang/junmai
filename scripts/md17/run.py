@@ -113,8 +113,6 @@ def run(args):
         )[0]
         loss_energy_te = (torch.nn.L1Loss()(E_te_hat, E_te).item() * E_STD).item()
         loss_force_te = (torch.nn.L1Loss()(F_te_hat, F_te).item() * E_STD).item()
-        loss_energy = (loss_energy * E_STD).item()
-        loss_force = ((loss_force ** 0.5) * E_STD).item()
         print(loss_energy, loss_force, loss_energy_te, loss_force_te, flush=True)
     
 
@@ -125,11 +123,11 @@ if __name__ == "__main__":
     parser.add_argument("--depth", type=int, default=1)
     parser.add_argument("--test-path", type=str, default="ethanol_ccsd_t-train.npz")
     parser.add_argument("--num-rbf", type=int, default=50)
-    parser.add_argument("--num_coefficients", type=int, default=16)
-    parser.add_argument("--hidden-features", type=int, default=16)
+    parser.add_argument("--num_coefficients", type=int, default=32)
+    parser.add_argument("--hidden-features", type=int, default=132
     parser.add_argument("--lr", type=float, default=1e-2)
     parser.add_argument("--weight-decay", type=float, default=1e-10)
-    parser.add_argument("--batch-size", type=int, default=8)
+    parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--alpha", type=float, default=0.1)
     args = parser.parse_args()
     run(args)
