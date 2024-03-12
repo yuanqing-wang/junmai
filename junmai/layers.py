@@ -22,51 +22,41 @@ class SakeLayer(torch.nn.Module):
 class JunmaiLayer(torch.nn.Module):
     def __init__(
         self,
-        in_features: int,
-        out_features: int,
-        num_coefficients: Optional[int] = None,
+        hidden_features: Optional[int] = None,
         num_rbf: Optional[int] = None,
+        out_features: int = 1,
         smearing: torch.nn.Module = ExpNormalSmearing,
     ):
         super().__init__()
-        if num_coefficients is None:
-            num_coefficients = in_features
-        self.num_coefficients = num_coefficients
+        self.hidden_features = hidden_features
         self.smearing = smearing(num_rbf=num_rbf)
         num_rbf = self.smearing.num_rbf
-
-        self.fc_basis = torch.nn.Linear(
-            num_rbf, num_coefficients, # bias=False
-        )
+        self.num_rbf = num_rbf
+        # self.fc_basis = torch.nn.Linear(
+        #     num_rbf, hidden_features, # bias=False
+        # )
 
         self.fc_summary = torch.nn.Sequential(
             torch.nn.SiLU(),
-            torch.nn.Linear(num_coefficients, out_features),
+            torch.nn.Linear(hidden_features, out_features),
         )
 
-        self.fc_coefficient = torch.nn.Linear(
-            in_features, 4 * num_coefficients * num_coefficients
-        )
-
-
-        # self.W = torch.nn.Parameter(
-        #     torch.randn(
-        #         9, 9, 9, 9, num_coefficients, num_coefficients,
-        #     ),
+        # self.fc_coefficient = torch.nn.Linear(
+        #     in_features, 4 * num_rbf * hidden_features
         # )
 
     def forward(
         self,
-        h: torch.Tensor,
         x: torch.Tensor,
+        W: torch.Tensor,
     ):  
-        # (N, N_COEFFICIENTS, 4 * N_COEFFICIENTS)
-        h = self.fc_coefficient(h)
-        h = h.reshape(*h.shape[:-1], self.num_coefficients, 4 * self.num_coefficients)
+        # # (N, N_COEFFICIENTS, 4 * N_COEFFICIENTS)
+        # h = self.fc_coefficient(h)
+        # h = h.reshape(*h.shape[:-1], self.num_rbf, 4 * self.hidden_features)
 
-        # (N, N, N, N_COEFFICIENTS, N_COEFFICIENTS)
-        h0, h1, h2, h3 = h.chunk(4, dim=-1)
-        h = torch.einsum("...iab, ...jab, ...kab, ...lab -> ...ijklab", h0, h1, h2, h3)
+        # # (N, N, N, N_COEFFICIENTS, N_COEFFICIENTS)
+        # h0, h1, h2, h3 = h.chunk(4, dim=-1)
+        # h = torch.einsum("...iab, ...jab, ...kab, ...lab -> ...ijklab", h0, h1, h2, h3)
 
         # (N, N, 3)
         x_minus_xt = x.unsqueeze(-2) - x.unsqueeze(-3)
@@ -83,7 +73,8 @@ class JunmaiLayer(torch.nn.Module):
         x_minus_xt_smear = self.smearing(x_minus_xt_norm)
 
         # (N, N, N_COEFFICIENTS)
-        x_minus_xt_basis = self.fc_basis(x_minus_xt_smear)
+        # x_minus_xt_basis = self.fc_basis(x_minus_xt_smear)
+        x_minus_xt_basis = x_minus_xt_smear
 
         # (N, N, N_COEFFICIENTS, 3)
         x_minus_xt_basis = x_minus_xt_basis.unsqueeze(-1) * x_minus_xt.unsqueeze(-2)
@@ -93,7 +84,7 @@ class JunmaiLayer(torch.nn.Module):
             "...abkc, ...dekc, ...abdeko -> ...ao",
             x_minus_xt_basis,
             x_minus_xt_basis,
-            h,
+            W,
         )
         h = self.fc_summary(h)
 

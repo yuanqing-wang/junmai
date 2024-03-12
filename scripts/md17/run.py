@@ -30,10 +30,8 @@ def run(args):
     model = JunmaiModel(
         in_features=Z.shape[-1],
         hidden_features=args.hidden_features,
-        depth=args.depth,
-        alpha=args.alpha,
         num_rbf=args.num_rbf,
-        num_coefficients=args.num_coefficients,
+        num_particles=Z.shape[1],
     )
 
     if torch.cuda.is_available():
@@ -77,7 +75,7 @@ def run(args):
             R_batch = R[idx]
             Z_batch = Z
 
-            E_hat, h_last = model(Z_batch, R_batch)
+            E_hat = model(R_batch)
 
             # h_last_var = h_last.var(dim=0).mean()
 
@@ -95,7 +93,7 @@ def run(args):
 
 
         model.eval()
-        E_hat, _ = model(Z, R)
+        E_hat = model(R)
         F_hat = -1.0 * torch.autograd.grad(
             E_hat.sum(),
             R,
@@ -105,7 +103,7 @@ def run(args):
         loss_force = (torch.nn.L1Loss()(F_hat, F).item() * E_STD).item()
         scheduler.step(loss_energy)
 
-        E_te_hat, _ = model(Z_te, R_te)
+        E_te_hat = model(R_te)
         F_te_hat = -1.0 * torch.autograd.grad(
             E_te_hat.sum(),
             R_te,
@@ -123,7 +121,6 @@ if __name__ == "__main__":
     parser.add_argument("--depth", type=int, default=1)
     parser.add_argument("--test-path", type=str, default="ethanol_ccsd_t-train.npz")
     parser.add_argument("--num-rbf", type=int, default=50)
-    parser.add_argument("--num_coefficients", type=int, default=32)
     parser.add_argument("--hidden-features", type=int, default=32)
     parser.add_argument("--lr", type=float, default=1e-2)
     parser.add_argument("--weight-decay", type=float, default=1e-10)
