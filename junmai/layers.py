@@ -50,14 +50,6 @@ class JunmaiLayer(torch.nn.Module):
         x: torch.Tensor,
         W: torch.Tensor,
     ):  
-        # # (N, N_COEFFICIENTS, 4 * N_COEFFICIENTS)
-        # h = self.fc_coefficient(h)
-        # h = h.reshape(*h.shape[:-1], self.num_rbf, 4 * self.hidden_features)
-
-        # # (N, N, N, N_COEFFICIENTS, N_COEFFICIENTS)
-        # h0, h1, h2, h3 = h.chunk(4, dim=-1)
-        # h = torch.einsum("...iab, ...jab, ...kab, ...lab -> ...ijklab", h0, h1, h2, h3)
-
         # (N, N, 3)
         x_minus_xt = x.unsqueeze(-2) - x.unsqueeze(-3)
 
@@ -72,34 +64,26 @@ class JunmaiLayer(torch.nn.Module):
         # (N, N, N_RBF)
         x_minus_xt_smear = self.smearing(x_minus_xt_norm)
 
-        # (N, N, N_COEFFICIENTS)
-        # x_minus_xt_basis = self.fc_basis(x_minus_xt_smear)
-        x_minus_xt_basis = x_minus_xt_smear
+        # (N, N, N_RBF, 3)
+        x_minus_xt_basis = x_minus_xt_smear.unsqueeze(-1) * x_minus_xt.unsqueeze(-2)
 
-        # (N, N, N_COEFFICIENTS, 3)
-        x_minus_xt_basis = x_minus_xt_basis.unsqueeze(-1) * x_minus_xt.unsqueeze(-2)
-
-        # (N_COEFFICIENTS,)
-        h = torch.einsum(
-            "...abkc, ...dekc, ...abdeko -> ...ao",
-            x_minus_xt_basis,
+        # (N, N, N_COEFFICIENT, 3)
+        x_minus_xt_basis = torch.einsum(
+            "...ab, ...ac -> ...bc",
             x_minus_xt_basis,
             W,
         )
-        h = self.fc_summary(h)
 
-        return h
-    
-    # def forward(self, h, x):
-    #     delta_x = x.unsqueeze(-2) - x.unsqueeze(-3)
-    #     delta_x_norm = delta_x.pow(2).sum(-1, keepdims=True)
-    #     delta_x_norm_smeared = self.smearing(delta_x_norm)
-    #     delta_x_norm_smeared = self.fc_basis(delta_x_norm_smeared)
-    #     delta_x = delta_x / (delta_x_norm + EPSILON)
-    #     delta_x = delta_x.unsqueeze(-2) * delta_x_norm_smeared.unsqueeze(-1)
-    #     delta_x = torch.einsum("...abkc, ...dekc, abdeko -> ...o", delta_x, delta_x, self.W)
-    #     return self.fc_summary(delta_x)
+        # (N, N, N_COEFFICIENT)
+        x_att = torch.einsum(
+            "...ab, ...ab -> ...a",
+            x_minus_xt_basis,
+            x_minus_xt_basis,
+        )
 
+        # (N, N, N_COEFFICIENT)
+        x_att = self.fc_summary(x_att).sum(-2)
+        return x_att
 
 class GaussianDropout(torch.nn.Module):
     def __init__(self, alpha: float):

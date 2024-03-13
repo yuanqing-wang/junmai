@@ -12,6 +12,15 @@ def get_data(data):
 def run(args):
     data = np.load(args.path)
     E, F, R, Z = get_data(data)
+
+    # from junmai.functional import edge_outer_product, edge_outer_product_jacobian
+    # R_EOP = edge_outer_product(R[0])
+    # # F_EPO = torch.stack([edge_outer_product_jacobian(_R) for _R in R.unbind(0)], 0)
+    # for _R in R.unbind(0):
+    #     print(_R.shape)
+    #     F_EPO = edge_outer_product_jacobian(_R)
+    #     print(F_EPO.shape)
+
     E_MEAN, E_STD = E.mean(), E.std()
     data_te = np.load(args.test_path)
     E_te, F_te, R_te, Z_te = get_data(data_te)
@@ -78,7 +87,6 @@ def run(args):
             E_hat = model(R_batch)
 
             # h_last_var = h_last.var(dim=0).mean()
-
             loss_energy = torch.nn.L1Loss()(E_hat, E_batch)
             F_hat = -1.0 * torch.autograd.grad(
                 E_hat.sum(),
@@ -120,7 +128,7 @@ if __name__ == "__main__":
     parser.add_argument("--path", type=str, default="ethanol_ccsd_t-train.npz")
     parser.add_argument("--depth", type=int, default=1)
     parser.add_argument("--test-path", type=str, default="ethanol_ccsd_t-train.npz")
-    parser.add_argument("--num-rbf", type=int, default=50)
+    parser.add_argument("--num-rbf", type=int, default=10)
     parser.add_argument("--hidden-features", type=int, default=32)
     parser.add_argument("--lr", type=float, default=1e-2)
     parser.add_argument("--weight-decay", type=float, default=1e-10)

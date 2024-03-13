@@ -11,7 +11,7 @@ def get_data(data):
     return E, F, R, Z
 
 class Model(torch.nn.Module):
-    def __init__(self, in_features, hidden_features, n_basis=16):
+    def __init__(self, in_features, hidden_features, n_basis=50):
         super().__init__()
         self.fc = torch.nn.Sequential(
             torch.nn.Linear(n_basis * (in_features ** 2), hidden_features),
@@ -22,11 +22,15 @@ class Model(torch.nn.Module):
         self.K = torch.nn.Parameter(torch.randn(in_features, in_features, n_basis))
         self.Q = self.K
         # self.Q = torch.nn.Parameter(1e-3 * torch.randn(in_features, in_features, n_basis))
-        # self.smearing = ExpNormalSmearing()
+        self.smearing = ExpNormalSmearing()
     
     def forward(self, x):
         delta_x = x.unsqueeze(-2) - x.unsqueeze(-3)
-        delta_x = delta_x.unsqueeze(-2)
+        delta_x_norm_sq = (delta_x.pow(2).sum(-1, keepdims=True) + 1e-8)
+        delta_x_norm = delta_x_norm_sq.sqrt()
+        delta_x = delta_x / delta_x_norm_sq
+        delta_x_norm_smeared = self.smearing(delta_x_norm)
+        delta_x = delta_x.unsqueeze(-2) * delta_x_norm_smeared.unsqueeze(-1)
         k = self.K.unsqueeze(-1) * delta_x
         q = self.Q.unsqueeze(-1) * delta_x
         xxt = torch.einsum("...ij,...ij->...i", k, q)
@@ -37,6 +41,7 @@ def run():
     data = np.load("ethanol_ccsd_t-train.npz")
     E, F, R, Z = get_data(data)
     E, F, R = E[:100], F[:100], R[:100] 
+    Z = torch.randn_like(Z)
     R.requires_grad_(True)
     E_MEAN, E_STD = E.mean(), E.std()
     E = (E - E_MEAN) / E_STD

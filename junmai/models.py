@@ -14,7 +14,7 @@ class JunmaiModel(torch.nn.Module):
         super().__init__()
         self.semantic = InductiveParameter(
             num_particles=num_particles,
-            in_features=in_features,
+            in_features=num_rbf,
             out_features=hidden_features,
         )
 
@@ -23,7 +23,6 @@ class JunmaiModel(torch.nn.Module):
             hidden_features=hidden_features,
             num_rbf=num_rbf,
         )
-
 
     def forward(self, x):
         W = self.semantic()
