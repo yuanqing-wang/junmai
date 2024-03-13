@@ -12,8 +12,6 @@ class InductiveParameter(torch.nn.Module):
             torch.randn(
                 num_particles, 
                 num_particles, 
-                num_particles,
-                num_particles,
                 in_features, 
                 out_features,
             ),

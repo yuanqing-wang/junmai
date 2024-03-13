@@ -121,15 +121,14 @@ def run(args):
         loss_force_te = (torch.nn.L1Loss()(F_te_hat, F_te).item() * E_STD).item()
         print(loss_energy, loss_force, loss_energy_te, loss_force_te, flush=True)
     
-
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Run MD simulation")
     parser.add_argument("--path", type=str, default="ethanol_ccsd_t-train.npz")
     parser.add_argument("--depth", type=int, default=1)
     parser.add_argument("--test-path", type=str, default="ethanol_ccsd_t-train.npz")
-    parser.add_argument("--num-rbf", type=int, default=10)
-    parser.add_argument("--hidden-features", type=int, default=32)
+    parser.add_argument("--num-rbf", type=int, default=50)
+    parser.add_argument("--hidden-features", type=int, default=64)
     parser.add_argument("--lr", type=float, default=1e-2)
     parser.add_argument("--weight-decay", type=float, default=1e-10)
     parser.add_argument("--batch-size", type=int, default=32)

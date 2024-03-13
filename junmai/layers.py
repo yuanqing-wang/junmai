@@ -69,7 +69,7 @@ class JunmaiLayer(torch.nn.Module):
 
         # (N, N, N_COEFFICIENT, 3)
         x_minus_xt_basis = torch.einsum(
-            "...ab, ...ac -> ...bc",
+            "...nab, ...nac -> ...cb",
             x_minus_xt_basis,
             W,
         )
