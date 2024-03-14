@@ -17,5 +17,14 @@ class InductiveParameter(torch.nn.Module):
             ),
         )
 
+        self.W1 = torch.nn.Parameter(
+            torch.randn(
+                num_particles, 
+                num_particles, 
+                in_features, 
+                out_features,
+            ),
+        )
+
     def forward(self, ):
-        return self.W
+        return (self.W, self.W1)

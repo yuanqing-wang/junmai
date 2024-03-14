@@ -29,6 +29,9 @@ def run(args):
     E_te = (E_te - E_MEAN) / E_STD
     F_te = F_te / E_STD
     Z = torch.randn_like(Z)
+    Z = torch.nn.functional.one_hot(
+        torch.arange(Z.shape[-2])
+    )
     # Z_te = torch.randn_like(Z_te)
     Z_te = Z
 
@@ -127,7 +130,7 @@ if __name__ == "__main__":
     parser.add_argument("--path", type=str, default="ethanol_ccsd_t-train.npz")
     parser.add_argument("--depth", type=int, default=1)
     parser.add_argument("--test-path", type=str, default="ethanol_ccsd_t-train.npz")
-    parser.add_argument("--num-rbf", type=int, default=50)
+    parser.add_argument("--num-rbf", type=int, default=100)
     parser.add_argument("--hidden-features", type=int, default=64)
     parser.add_argument("--lr", type=float, default=1e-2)
     parser.add_argument("--weight-decay", type=float, default=1e-10)

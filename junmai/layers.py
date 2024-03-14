@@ -50,6 +50,8 @@ class JunmaiLayer(torch.nn.Module):
         x: torch.Tensor,
         W: torch.Tensor,
     ):  
+        K, Q = W
+
         # (N, N, 3)
         x_minus_xt = x.unsqueeze(-2) - x.unsqueeze(-3)
 
@@ -68,17 +70,23 @@ class JunmaiLayer(torch.nn.Module):
         x_minus_xt_basis = x_minus_xt_smear.unsqueeze(-1) * x_minus_xt.unsqueeze(-2)
 
         # (N, N, N_COEFFICIENT, 3)
-        x_minus_xt_basis = torch.einsum(
+        x_minus_xt_basis_k = torch.einsum(
             "...nab, ...nac -> ...cb",
             x_minus_xt_basis,
-            W,
+            K,
+        )
+
+        x_minus_xt_basis_q = torch.einsum(
+            "...nab, ...nac -> ...cb",
+            x_minus_xt_basis,
+            K,
         )
 
         # (N, N, N_COEFFICIENT)
         x_att = torch.einsum(
             "...ab, ...ab -> ...a",
-            x_minus_xt_basis,
-            x_minus_xt_basis,
+            x_minus_xt_basis_k,
+            x_minus_xt_basis_q,
         )
 
         # (N, N, N_COEFFICIENT)
