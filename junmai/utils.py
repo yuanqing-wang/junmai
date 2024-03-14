@@ -1,10 +1,10 @@
 import torch
 import math
 
-NUM_RBF = 100
+NUM_RBF = 50
 CUTOFF_LOWER = 1e-12
 CUTOFF_UPPER = 5.0
-EPSILON = 1e-12
+EPSILON = 1e-6
 INF = 1e5
 
 def get_x_minus_xt(x):
