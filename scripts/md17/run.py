@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+import lightning as pl
 
 def get_data(data):
     E, F, R, Z = data["E"], data["F"], data["R"], data["z"]
@@ -37,6 +38,13 @@ def run(args):
 
     R.requires_grad_(True)
     R_te.requires_grad_(True)
+
+    dataset = torch.utils.data.TensorDataset(E, F, R)
+    dataloader = torch.utils.data.DataLoader(
+        dataset,
+        batch_size=args.batch_size if args.batch_size > 0 else E.shape[0],
+        shuffle=True,
+    )
     
     from junmai.models import JunmaiModel
     model = JunmaiModel(
@@ -74,55 +82,9 @@ def run(args):
         verbose=True,
     )
 
-    for i in range(1000000):
-        idxs = torch.randperm(E.shape[0])
-        batch_size = args.batch_size if args.batch_size > 0 else E.shape[0]
-        n_batches = E.shape[0] // batch_size
-        for idx_batch in range(n_batches):
-            model.train()
-            optimizer.zero_grad()
-            idx = idxs[idx_batch * batch_size : (idx_batch + 1) * batch_size]
-            E_batch = E[idx]
-            F_batch = F[idx]
-            R_batch = R[idx]
-            Z_batch = Z
+    trainer = pl.Trainer(limit_train_batches=100, max_epochs=1)
+    trainer.fit(model, dataloader)
 
-            E_hat = model(R_batch)
-
-            # h_last_var = h_last.var(dim=0).mean()
-            loss_energy = torch.nn.L1Loss()(E_hat, E_batch)
-            F_hat = -1.0 * torch.autograd.grad(
-                E_hat.sum(),
-                R_batch,
-                create_graph=True,
-            )[0]
-
-            loss_force = torch.nn.MSELoss()(F_hat, F_batch)     
-            loss = loss_force + 0.01 * loss_energy
-            loss.backward()
-            optimizer.step()
-
-
-        model.eval()
-        E_hat = model(R)
-        F_hat = -1.0 * torch.autograd.grad(
-            E_hat.sum(),
-            R,
-            create_graph=True,
-        )[0]
-        loss_energy = (torch.nn.L1Loss()(E_hat, E).item() * E_STD).item()
-        loss_force = (torch.nn.L1Loss()(F_hat, F).item() * E_STD).item()
-        scheduler.step(loss_energy)
-
-        E_te_hat = model(R_te)
-        F_te_hat = -1.0 * torch.autograd.grad(
-            E_te_hat.sum(),
-            R_te,
-            create_graph=True,
-        )[0]
-        loss_energy_te = (torch.nn.L1Loss()(E_te_hat, E_te).item() * E_STD).item()
-        loss_force_te = (torch.nn.L1Loss()(F_te_hat, F_te).item() * E_STD).item()
-        print(loss_energy, loss_force, loss_energy_te, loss_force_te, flush=True)
     
 if __name__ == "__main__":
     import argparse
