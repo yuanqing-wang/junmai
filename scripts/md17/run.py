@@ -1,6 +1,13 @@
 import numpy as np
 import torch
 import lightning as pl
+from ray.train.lightning import (
+    RayDDPStrategy,
+    RayLightningEnvironment,
+    RayTrainReportCallback,
+    prepare_trainer,
+)
+
 
 def get_data(data):
     E, F, R, Z = data["E"], data["F"], data["R"], data["z"]
@@ -46,6 +53,13 @@ def run(args):
         shuffle=True,
     )
     
+    dataset_te = torch.utils.data.TensorDataset(E_te, F_te, R_te)
+    dataloader_te = torch.utils.data.DataLoader(
+        dataset_te,
+        batch_size=args.batch_size if args.batch_size > 0 else E_te.shape[0],
+        shuffle=True,
+    )
+
     from junmai.models import JunmaiModel
     model = JunmaiModel(
         in_features=Z.shape[-1],
@@ -53,20 +67,6 @@ def run(args):
         num_rbf=args.num_rbf,
         num_particles=Z.shape[1],
     )
-
-    if torch.cuda.is_available():
-        model = model.cuda()
-        E = E.cuda()
-        F = F.cuda()
-        R = R.cuda()
-        Z = Z.cuda()
-        E_te = E_te.cuda()
-        F_te = F_te.cuda()
-        R_te = R_te.cuda()
-        Z_te = Z_te.cuda()
-
-    # R.requires_grad_(True)
-    # R_te.requires_grad_(True)
 
     optimizer = torch.optim.Adam(
         model.parameters(),
@@ -82,8 +82,15 @@ def run(args):
         verbose=True,
     )
 
-    trainer = pl.Trainer(limit_train_batches=100, max_epochs=1)
-    trainer.fit(model, dataloader)
+    trainer = pl.Trainer(
+        limit_train_batches=100, 
+        max_epochs=10000, 
+        log_every_n_steps=1, 
+        logger=True,
+        devices="auto",
+        accelerator="auto",
+    )
+    trainer.fit(model, dataloader, dataloader_te)
 
     
 if __name__ == "__main__":

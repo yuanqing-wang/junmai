@@ -6,4 +6,5 @@
 #SBATCH --gres=gpu:1
 #SBATCH --ntasks-per-node=1
 
-python run.py --path ethanol_ccsd_t-train.npz --test-path ethanol_ccsd_t-test.npz 
+# python run.py --path ethanol_ccsd_t-train.npz --test-path ethanol_ccsd_t-test.npz 
+python tune.py

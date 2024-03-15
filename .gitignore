@@ -169,3 +169,11 @@ cython_debug/
 *.txt
 *.tar.gz
 .vscode
+*.yaml
+*.ckpt
+
+*.yaml
+*.pkl
+*.json
+*.csv
+*.out.*

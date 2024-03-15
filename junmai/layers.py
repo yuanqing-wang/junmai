@@ -32,19 +32,10 @@ class JunmaiLayer(torch.nn.Module):
         self.smearing = smearing(num_rbf=num_rbf)
         num_rbf = self.smearing.num_rbf
         self.num_rbf = num_rbf
-        # self.fc_basis = torch.nn.Linear(
-        #     num_rbf, hidden_features, # bias=False
-        # )
-
         self.fc_summary = torch.nn.Sequential(
             torch.nn.SiLU(),
             torch.nn.Linear(hidden_features, out_features),
         )
-
-        # self.fc_coefficient = torch.nn.Linear(
-        #     in_features, 4 * num_rbf * hidden_features
-        # )
-
     def forward(
         self,
         x: torch.Tensor,
@@ -79,7 +70,7 @@ class JunmaiLayer(torch.nn.Module):
         x_minus_xt_basis_q = torch.einsum(
             "...nab, ...nac -> ...cb",
             x_minus_xt_basis,
-            K,
+            Q,
         )
 
         # (N, N, N_COEFFICIENT)
