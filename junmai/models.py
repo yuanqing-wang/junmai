@@ -2,8 +2,7 @@ from typing import Optional
 import torch
 import lightning as pl
 import ray
-from .layers import JunmaiLayer, GaussianDropout
-from .semantic import InductiveParameter
+from .layers import JunmaiLayer, GaussianDropout, InductiveParameter, TransductiveParameter
 
 class JunmaiModel(pl.LightningModule):
     def __init__(
@@ -16,12 +15,21 @@ class JunmaiModel(pl.LightningModule):
         weight_decay: float = 1e-5,
     ):
         super().__init__()
-        self.semantic = InductiveParameter(
-            num_particles=num_particles,
-            in_features=num_rbf,
-            out_features=hidden_features,
-        )
 
+        if num_particles is not None:
+            self.semantic = InductiveParameter(
+                num_particles=num_particles,
+                in_features=num_rbf,
+                out_features=hidden_features,
+            )
+        else:
+            self.semantic = TransductiveParameter(
+                in_features=in_features,
+                out_features=hidden_features,
+                hidden_features=hidden_features,
+                num_rbf=num_rbf,
+            )
+            
         self.layer = JunmaiLayer(
             out_features=1,
             hidden_features=hidden_features,
@@ -31,13 +39,13 @@ class JunmaiModel(pl.LightningModule):
         self.lr = lr
         self.weight_decay = weight_decay
 
-    def forward(self, x):
-        W = self.semantic()
-        return self.layer(x, W)
+    def forward(self, x, h):
+        W = self.semantic(x, h)
+        return self.layer(x, W).sum(-2)
     
     def training_step(self, batch, batch_idx):
-        E, F, R = batch
-        E_hat = self(R)
+        E, F, R, Z = batch
+        E_hat = self(R, Z)
         F_hat = -torch.autograd.grad(E_hat.sum(), R, create_graph=True)[0]
         loss_energy = torch.nn.functional.mse_loss(E_hat, E)
         loss_force = torch.nn.functional.mse_loss(F_hat, F)
@@ -45,11 +53,11 @@ class JunmaiModel(pl.LightningModule):
         return loss
     
     def validation_step(self, batch, batch_idx):
-        E, F, R = batch
+        E, F, R, Z = batch
         R.requires_grad_(True)
         # enable grad
         with torch.set_grad_enabled(True):
-            E_hat = self(R)
+            E_hat = self(R, Z)
             F_hat = -torch.autograd.grad(E_hat.sum(), R, create_graph=True)[0]
         loss_energy = torch.nn.functional.l1_loss(E_hat, E)
         loss_force = torch.nn.functional.l1_loss(F_hat, F)

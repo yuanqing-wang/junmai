@@ -11,26 +11,73 @@ from .utils import (
     EPSILON,
 )
 
-class SakeLayer(torch.nn.Module):
+class InductiveParameter(torch.nn.Module):
+    def __init__(
+            self,
+            num_rbf: int,
+            out_features: int,
+            num_particles: int,
+    ):
+        super().__init__()
+        self.K = torch.nn.Parameter(
+            torch.randn(
+                num_particles, 
+                num_particles, 
+                num_rbf, 
+                out_features,
+            ),
+        )
+
+        self.Q = torch.nn.Parameter(
+            torch.randn(
+                num_particles, 
+                num_particles, 
+                num_rbf, 
+                out_features,
+            ),
+        )
+
+    def forward(self, *args, **kwargs):
+        return (self.K, self.Q)
+
+class TransductiveParameter(torch.nn.Module):
     def __init__(
             self,
             in_features: int,
             out_features: int,
+            hidden_features: int,
+            num_rbf: int,
+            smearing: torch.nn.Module = ExpNormalSmearing,
     ):
-        pass
+        super().__init__()
+        self.layer = JunmaiLayer(hidden_features=hidden_features, out_features=2 * out_features * num_rbf, num_rbf=num_rbf, smearing=smearing)
+        self.fc = torch.nn.Linear(in_features, 2 * num_rbf * hidden_features, bias=False)
+        self.hidden_features = hidden_features
+        self.num_rbf = num_rbf
+
+    def forward(self, x, h):
+        h = self.fc(h)
+        h = h.unsqueeze(-2) + h.unsqueeze(-3)
+        K, Q = h.chunk(2, -1)
+        K = K.view(*K.shape[:-1], self.num_rbf, self.hidden_features)
+        Q = Q.view(*Q.shape[:-1], self.num_rbf, self.hidden_features)
+        h = self.layer(x, (K, Q))
+        h = h.view(*h.shape[:-1], self.num_rbf, -1)
+        h = h.unsqueeze(-3) + h.unsqueeze(-4)
+        K, Q = h.chunk(2, -1)
+        return (K, Q)
 
 class JunmaiLayer(torch.nn.Module):
     def __init__(
         self,
         hidden_features: Optional[int] = None,
-        num_rbf: Optional[int] = None,
         out_features: int = 1,
+        num_rbf: Optional[int] = None,
         smearing: torch.nn.Module = ExpNormalSmearing,
     ):
         super().__init__()
         self.hidden_features = hidden_features
         self.smearing = smearing(num_rbf=num_rbf)
-        num_rbf = self.smearing.num_rbf
         self.num_rbf = num_rbf
         self.fc_summary = torch.nn.Sequential(
             torch.nn.SiLU(),
@@ -60,7 +107,7 @@ class JunmaiLayer(torch.nn.Module):
         # (N, N, N_RBF, 3)
         x_minus_xt_basis = x_minus_xt_smear.unsqueeze(-1) * x_minus_xt.unsqueeze(-2)
 
-        # (N, N, N_COEFFICIENT, 3)
+        # (N, N_COEFFICIENT, 3)
         x_minus_xt_basis_k = torch.einsum(
             "...nab, ...nac -> ...cb",
             x_minus_xt_basis,
@@ -73,7 +120,7 @@ class JunmaiLayer(torch.nn.Module):
             Q,
         )
 
-        # (N, N, N_COEFFICIENT)
+        # (N, N_COEFFICIENT)
         x_att = torch.einsum(
             "...ab, ...ab -> ...a",
             x_minus_xt_basis_k,
@@ -81,7 +128,7 @@ class JunmaiLayer(torch.nn.Module):
         )
 
         # (N, N, N_COEFFICIENT)
-        x_att = self.fc_summary(x_att).sum(-2)
+        x_att = self.fc_summary(x_att)
         return x_att
 
 class GaussianDropout(torch.nn.Module):

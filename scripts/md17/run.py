@@ -1,12 +1,7 @@
 import numpy as np
 import torch
 import lightning as pl
-from ray.train.lightning import (
-    RayDDPStrategy,
-    RayLightningEnvironment,
-    RayTrainReportCallback,
-    prepare_trainer,
-)
+from lightning.pytorch.loggers import CSVLogger
 
 
 def get_data(data):
@@ -36,24 +31,20 @@ def run(args):
     F = F / E_STD
     E_te = (E_te - E_MEAN) / E_STD
     F_te = F_te / E_STD
-    Z = torch.randn_like(Z)
-    Z = torch.nn.functional.one_hot(
-        torch.arange(Z.shape[-2])
-    )
-    # Z_te = torch.randn_like(Z_te)
-    Z_te = Z
 
     R.requires_grad_(True)
     R_te.requires_grad_(True)
 
-    dataset = torch.utils.data.TensorDataset(E, F, R)
+    Z = Z.repeat(E.shape[0], 1, 1)
+
+    dataset = torch.utils.data.TensorDataset(E, F, R, Z)
     dataloader = torch.utils.data.DataLoader(
         dataset,
         batch_size=args.batch_size if args.batch_size > 0 else E.shape[0],
         shuffle=True,
     )
     
-    dataset_te = torch.utils.data.TensorDataset(E_te, F_te, R_te)
+    dataset_te = torch.utils.data.TensorDataset(E_te, F_te, R_te, Z)
     dataloader_te = torch.utils.data.DataLoader(
         dataset_te,
         batch_size=args.batch_size if args.batch_size > 0 else E_te.shape[0],
@@ -65,28 +56,14 @@ def run(args):
         in_features=Z.shape[-1],
         hidden_features=args.hidden_features,
         num_rbf=args.num_rbf,
-        num_particles=Z.shape[1],
-    )
-
-    optimizer = torch.optim.Adam(
-        model.parameters(),
-        lr=args.lr,
-        weight_decay=args.weight_decay,
-    )
-
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer,
-        mode="min",
-        factor=0.5,
-        patience=100,
-        verbose=True,
+        # num_particles=Z.shape[1],
     )
 
     trainer = pl.Trainer(
         limit_train_batches=100, 
         max_epochs=10000, 
         log_every_n_steps=1, 
-        logger=True,
+        logger=CSVLogger("logs", name="junmai"),
         devices="auto",
         accelerator="auto",
     )
