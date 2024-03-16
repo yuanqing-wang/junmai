@@ -6,7 +6,7 @@ import requests
 from torch.utils.data import TensorDataset, DataLoader
 CACHE_DIR = os.path.join(Path(__file__), ".cache/")
 
-class MD17(pl.DataModule):
+class MD17(pl.LightningDataModule):
     def __init__(
             self, 
             name: str,
