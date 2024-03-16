@@ -14,13 +14,15 @@ class JunmaiModel(pl.LightningModule):
         alpha: float = 1e-3,
         lr: float = 1e-3,
         weight_decay: float = 1e-5,
+        E_MEAN: float = 0.0,
+        E_STD: float = 1.0,
     ):
         super().__init__()
 
         if num_particles is not None:
             self.semantic = InductiveParameter(
                 num_particles=num_particles,
-                in_features=num_rbf,
+                num_rbf=num_rbf,
                 out_features=hidden_features,
             )
         else:
@@ -40,6 +42,8 @@ class JunmaiModel(pl.LightningModule):
         self.validation_step_outputs = []
         self.lr = lr
         self.weight_decay = weight_decay
+        self.E_MEAN = E_MEAN
+        self.E_STD = E_STD
 
     def forward(self, x, h):
         K, Q = self.semantic(x.detach(), h)
@@ -47,21 +51,23 @@ class JunmaiModel(pl.LightningModule):
         return self.layer(x, (K, Q)).sum(-2)
     
     def training_step(self, batch, batch_idx):
-        E, F, R, Z = batch
+        R, E, F, Z = batch
+        R.requires_grad_(True)
         E_hat = self(R, Z)
         F_hat = -torch.autograd.grad(E_hat.sum(), R, create_graph=True)[0]
         loss_energy = torch.nn.functional.mse_loss(E_hat, E)
         loss_force = torch.nn.functional.mse_loss(F_hat, F)
-        loss = 1e-3 * loss_energy + loss_force
+        loss = 1e-2 * loss_energy + loss_force
         return loss
     
     def validation_step(self, batch, batch_idx):
-        E, F, R, Z = batch
+        R, E, F, Z = batch
         R.requires_grad_(True)
-        # enable grad
         with torch.set_grad_enabled(True):
             E_hat = self(R, Z)
             F_hat = -torch.autograd.grad(E_hat.sum(), R, create_graph=True)[0]
+        E_hat = E_hat * self.E_STD + self.E_MEAN
+        F_hat = F_hat * self.E_STD
         loss_energy = torch.nn.functional.l1_loss(E_hat, E)
         loss_force = torch.nn.functional.l1_loss(F_hat, F)
         self.validation_step_outputs.append((loss_energy, loss_force))
