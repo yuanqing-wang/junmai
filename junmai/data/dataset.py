@@ -16,8 +16,11 @@ class MD17(pl.DataModule):
             num_val: int = 50,
         ):
         super().__init__()
+        self.name = name
         self.batch_size = batch_size
         self.num_workers = num_workers
+        self.num_train = num_train
+        self.num_val = num_val
 
     def setup(self, stage=None):
         url = f"http://www.quantum-machine.org/gdml/data/npz/md17_{self.name}.npz"
