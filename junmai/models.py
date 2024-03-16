@@ -11,6 +11,7 @@ class JunmaiModel(pl.LightningModule):
         hidden_features: int,
         num_rbf: Optional[int] = None,
         num_particles: Optional[int] = None,
+        alpha: float = 1e-3,
         lr: float = 1e-3,
         weight_decay: float = 1e-5,
     ):
@@ -29,7 +30,8 @@ class JunmaiModel(pl.LightningModule):
                 hidden_features=hidden_features,
                 num_rbf=num_rbf,
             )
-            
+        
+        self.dropout = GaussianDropout(alpha=alpha)
         self.layer = JunmaiLayer(
             out_features=1,
             hidden_features=hidden_features,
@@ -40,8 +42,9 @@ class JunmaiModel(pl.LightningModule):
         self.weight_decay = weight_decay
 
     def forward(self, x, h):
-        W = self.semantic(x, h)
-        return self.layer(x, W).sum(-2)
+        K, Q = self.semantic(x.detach(), h)
+        K, Q = self.dropout(K), self.dropout(Q)
+        return self.layer(x, (K, Q)).sum(-2)
     
     def training_step(self, batch, batch_idx):
         E, F, R, Z = batch
