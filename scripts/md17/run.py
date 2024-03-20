@@ -124,7 +124,7 @@ if __name__ == "__main__":
     parser.add_argument("--test-path", type=str, default="ethanol_ccsd_t-train.npz")
     parser.add_argument("--num-rbf", type=int, default=50)
     parser.add_argument("--num_coefficients", type=int, default=32)
-    parser.add_argument("--hidden-features", type=int, default=132
+    parser.add_argument("--hidden-features", type=int, default=32)
     parser.add_argument("--lr", type=float, default=1e-2)
     parser.add_argument("--weight-decay", type=float, default=1e-10)
     parser.add_argument("--batch-size", type=int, default=32)
