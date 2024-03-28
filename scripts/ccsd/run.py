@@ -4,9 +4,10 @@ import lightning as pl
 from lightning.pytorch.loggers import CSVLogger
 
 def run(args):
-    from junmai.data.md17 import MD17
-    data = MD17(args.name, batch_size=args.batch_size)
+    from junmai.data.ccsd import CCSD
+    data = CCSD(args.name, batch_size=args.batch_size)
     data.setup()
+
     from junmai.models import JunmaiModel
     model = JunmaiModel(
         in_features=9,
@@ -19,7 +20,6 @@ def run(args):
         weight_decay=args.weight_decay,
     )
 
-    model = model.cuda()
     trainer = pl.Trainer(
         limit_train_batches=100, 
         max_epochs=10000, 

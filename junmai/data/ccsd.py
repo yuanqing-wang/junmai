@@ -7,12 +7,12 @@ import requests
 from torch.utils.data import TensorDataset, DataLoader
 CACHE_DIR = os.path.join(Path(__file__).parent, ".cache/")
 
-class MD17(pl.LightningDataModule):
+class CCSD(pl.LightningDataModule):
     def __init__(
             self, 
             name: str,
             batch_size: int = 32, 
-            num_workers: int = 4, 
+            num_workers: int = 1, 
             num_train: int = 950,
             num_val: int = 50,
         ):
@@ -26,32 +26,42 @@ class MD17(pl.LightningDataModule):
         self.E_MEAN = None
 
     def setup(self, stage=None):
-        url = f"http://www.quantum-machine.org/gdml/data/npz/md17_{self.name}.npz"
-        self.file_path = os.path.join(CACHE_DIR, f"md17_{self.name}.npz")
-        os.makedirs(CACHE_DIR, exist_ok=True)
-        if not os.path.exists(self.file_path):
+        url = f"http://www.quantum-machine.org/gdml/data/npz/{self.name}_ccsd_t.zip"
+        self.train_path = os.path.join(CACHE_DIR, f"{self.name}_ccsd_t-train.npz")
+        self.test_path = os.path.join(CACHE_DIR, f"{self.name}_ccsd_t-test.npz")
+        if not os.path.exists(self.train_path):
             r = requests.get(url, allow_redirects=True)
-            open(self.file_path, 'wb').write(r.content)
-        data = np.load(self.file_path)
-        self.R, self.E, self.F = data['R'], data['E'], data['F']
-        self.Z = data['z'][None, :].repeat(self.R.shape[0], 0)
-        self.R, self.E, self.F, self.Z = map(
+            open(self.train_path, 'wb').write(r.content)
+            # unzip the file
+            import zipfile
+            with zipfile.ZipFile(self.train_path, 'r') as zip_ref:
+                zip_ref.extractall(CACHE_DIR)
+
+        data_train = np.load(self.train_path)
+        R, E, F = data_train['R'], data_train['E'], data_train['F']
+        Z = data_train['z'][None, :].repeat(R.shape[0], 0)
+        R, E, F, Z = map(
             lambda x: torch.tensor(x, dtype=torch.float32),
-            (self.R, self.E, self.F, self.Z)
+            (R, E, F, Z)
         )
-        idxs = np.random.permutation(self.R.shape[0])
-        self.R_tr = self.R[idxs[:self.num_train]]
-        self.E_tr = self.E[idxs[:self.num_train]]
-        self.F_tr = self.F[idxs[:self.num_train]]
-        self.Z_tr = self.Z[idxs[:self.num_train]]
-        self.R_vl = self.R[idxs[self.num_train:self.num_train+self.num_val]]
-        self.E_vl = self.E[idxs[self.num_train:self.num_train+self.num_val]]
-        self.F_vl = self.F[idxs[self.num_train:self.num_train+self.num_val]]
-        self.Z_vl = self.Z[idxs[self.num_train:self.num_train+self.num_val]]
-        self.R_te = self.R[idxs[self.num_train+self.num_val:]]
-        self.E_te = self.E[idxs[self.num_train+self.num_val:]]
-        self.F_te = self.F[idxs[self.num_train+self.num_val:]]
-        self.Z_te = self.Z[idxs[self.num_train+self.num_val:]]
+        idxs = np.random.permutation(R.shape[0])
+        self.R_tr = R[idxs[:self.num_train]]
+        self.E_tr = E[idxs[:self.num_train]]
+        self.F_tr = F[idxs[:self.num_train]]
+        self.Z_tr = Z[idxs[:self.num_train]]
+        self.R_vl = R[idxs[self.num_train:self.num_train+self.num_val]]
+        self.E_vl = E[idxs[self.num_train:self.num_train+self.num_val]]
+        self.F_vl = F[idxs[self.num_train:self.num_train+self.num_val]]
+        self.Z_vl = Z[idxs[self.num_train:self.num_train+self.num_val]]
+
+        data_test = np.load(self.test_path)
+        self.R_te, self.E_te, self.F_te = data_test['R'], data_test['E'], data_test['F']
+        self.Z_te = data_test['z'][None, :].repeat(self.R_te.shape[0], 0)
+        self.R_te, self.E_te, self.F_te, self.Z_te = map(
+            lambda x: torch.tensor(x, dtype=torch.float32),
+            (self.R_te, self.E_te, self.F_te, self.Z_te)
+        )
+
         self.E_MEAN = self.E_tr.mean()
         self.E_STD = self.E_tr.std()
         self.E_tr = (self.E_tr - self.E_MEAN) / self.E_STD

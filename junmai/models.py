@@ -14,6 +14,8 @@ class JunmaiModel(pl.LightningModule):
         alpha: float = 1e-3,
         lr: float = 1e-3,
         weight_decay: float = 1e-5,
+        factor: float = 0.5,
+        patience: int = 10,
         E_MEAN: float = 0.0,
         E_STD: float = 1.0,
     ):
@@ -42,12 +44,13 @@ class JunmaiModel(pl.LightningModule):
         self.validation_step_outputs = []
         self.lr = lr
         self.weight_decay = weight_decay
+        self.factor = factor
+        self.patience = patience
         self.E_MEAN = E_MEAN
         self.E_STD = E_STD
 
     def forward(self, x, h):
         K, Q = self.semantic(x.detach(), h)
-        K, Q = self.dropout(K), self.dropout(Q)
         return self.layer(x, (K, Q)).sum(-2)
     
     def training_step(self, batch, batch_idx):
@@ -56,7 +59,9 @@ class JunmaiModel(pl.LightningModule):
         E_hat = self(R, Z)
         F_hat = -torch.autograd.grad(E_hat.sum(), R, create_graph=True)[0]
         loss_energy = torch.nn.functional.mse_loss(E_hat, E)
+        self.log("train_loss_energy", loss_energy)
         loss_force = torch.nn.functional.mse_loss(F_hat, F)
+        self.log("train_loss_force", loss_force)
         loss = 1e-2 * loss_energy + loss_force
         return loss
     
@@ -78,12 +83,31 @@ class JunmaiModel(pl.LightningModule):
         loss_force = torch.stack(loss_force).mean()
         self.log("val_loss_energy", loss_energy)
         self.log("val_loss_force", loss_force)
-        # ray.train.report({"loss_energy": loss_energy.item(), "loss_force": loss_force.item()})
         self.validation_step_outputs.clear()
 
     def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=self.lr, weight_decay=self.weight_decay)
+        optimizer = torch.optim.Adam(
+            self.parameters(), 
+            lr=self.lr, 
+            weight_decay=self.weight_decay
+        )
+
+        # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        #     optimizer, 
+        #     mode="min", 
+        #     factor=self.factor, 
+        #     patience=self.patience, 
+        #     min_lr=1e-6,
+        #     verbose=True,
+        # )
+
+        # scheduler = {
+        #     "scheduler": scheduler,
+        #     "monitor": "val_loss_energy",
+        # }
     
+        # return [optimizer], [scheduler]
+        return optimizer
     
     
 
