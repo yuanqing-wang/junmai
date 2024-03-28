@@ -1,3 +1,4 @@
+from os import X_OK
 from typing import Optional
 import math
 
@@ -66,6 +67,29 @@ class TransductiveParameter(torch.nn.Module):
         h = h.unsqueeze(-3) + h.unsqueeze(-4)
         K, Q = h.chunk(2, -1)
         return (K, Q)
+
+class DistanceTransductiveParameter(torch.nn.Module):
+    def __init__(
+            in_features: int,
+            out_features: int,
+            in_num_rbf: int,
+            out_num_rbf: int,
+            smearing: torch.nn.Module = ExpNormalSmearing,
+    ):
+        super().__init__()
+    
+    def forward(self, x, h):
+        h = self.fc(h)
+        h = h.unsqueeze(-2) + h.unsqueeze(-3)
+        # (N, N, 3)
+        x_minus_xt = x.unsqueeze(-2) - x.unsqueeze(-3)
+
+        # (N, N, 1)
+        # x_minus_xt_norm = get_x_minus_xt_norm(x_minus_xt)
+        x_minus_xt_norm_sq = (x_minus_xt.pow(2).sum(-1, keepdims=True) + EPSILON)
+        x_minus_xt_norm = x_minus_xt_norm_sq.sqrt()
+        x_minus_xt_smeared = self.smearing(x_minus_xt_norm)
+
 
 class JunmaiLayer(torch.nn.Module):
     def __init__(
