@@ -107,7 +107,6 @@ class JunmaiModel(pl.LightningModule):
         }
     
         return [optimizer], [scheduler]
-        return optimizer
     
     
 
