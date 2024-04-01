@@ -22,8 +22,6 @@ class CCSD(pl.LightningDataModule):
         self.num_workers = num_workers
         self.num_train = num_train
         self.num_val = num_val
-        self.E_STD = None
-        self.E_MEAN = None
 
     def setup(self, stage=None):
         url = f"http://www.quantum-machine.org/gdml/data/npz/{self.name}_ccsd_t.zip"
@@ -49,6 +47,7 @@ class CCSD(pl.LightningDataModule):
         self.E_tr = E[idxs[:self.num_train]]
         self.F_tr = F[idxs[:self.num_train]]
         self.Z_tr = Z[idxs[:self.num_train]]
+        self.E_tr = self.E_tr - self.E_tr.mean()
         # self.R_vl = R[idxs[self.num_train:self.num_train+self.num_val]]
         # self.E_vl = E[idxs[self.num_train:self.num_train+self.num_val]]
         # self.F_vl = F[idxs[self.num_train:self.num_train+self.num_val]]
@@ -57,6 +56,7 @@ class CCSD(pl.LightningDataModule):
         self.E_vl = E[idxs[self.num_train:]]
         self.F_vl = F[idxs[self.num_train:]]
         self.Z_vl = Z[idxs[self.num_train:]]
+        self.E_vl = self.E_vl - self.E_vl.mean()
 
         data_test = np.load(self.test_path)
         self.R_te, self.E_te, self.F_te = data_test['R'], data_test['E'], data_test['F']
@@ -65,11 +65,7 @@ class CCSD(pl.LightningDataModule):
             lambda x: torch.tensor(x, dtype=torch.float32),
             (self.R_te, self.E_te, self.F_te, self.Z_te)
         )
-
-        self.E_MEAN = self.E_tr.mean()
-        self.E_STD = self.E_tr.std()
-        self.E_tr = (self.E_tr - self.E_MEAN) / self.E_STD
-        self.F_tr = self.F_tr / self.E_STD
+        self.E_te = self.E_te - self.E_te.mean()
         self.ds_tr = TensorDataset(self.R_tr, self.E_tr, self.F_tr, self.Z_tr)
         self.ds_vl = TensorDataset(self.R_vl, self.E_vl, self.F_vl, self.Z_vl)
         self.ds_te = TensorDataset(self.R_te, self.E_te, self.F_te, self.Z_te)
