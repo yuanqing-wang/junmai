@@ -49,10 +49,14 @@ class CCSD(pl.LightningDataModule):
         self.E_tr = E[idxs[:self.num_train]]
         self.F_tr = F[idxs[:self.num_train]]
         self.Z_tr = Z[idxs[:self.num_train]]
-        self.R_vl = R[idxs[self.num_train:self.num_train+self.num_val]]
-        self.E_vl = E[idxs[self.num_train:self.num_train+self.num_val]]
-        self.F_vl = F[idxs[self.num_train:self.num_train+self.num_val]]
-        self.Z_vl = Z[idxs[self.num_train:self.num_train+self.num_val]]
+        # self.R_vl = R[idxs[self.num_train:self.num_train+self.num_val]]
+        # self.E_vl = E[idxs[self.num_train:self.num_train+self.num_val]]
+        # self.F_vl = F[idxs[self.num_train:self.num_train+self.num_val]]
+        # self.Z_vl = Z[idxs[self.num_train:self.num_train+self.num_val]]
+        self.R_vl = R[idxs[self.num_train:]]
+        self.E_vl = E[idxs[self.num_train:]]
+        self.F_vl = F[idxs[self.num_train:]]
+        self.Z_vl = Z[idxs[self.num_train:]]
 
         data_test = np.load(self.test_path)
         self.R_te, self.E_te, self.F_te = data_test['R'], data_test['E'], data_test['F']
