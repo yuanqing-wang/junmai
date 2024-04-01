@@ -37,7 +37,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run MD simulation")
     parser.add_argument("--name", type=str, default="ethanol")
     parser.add_argument("--depth", type=int, default=1)
-    parser.add_argument("--num-rbf", type=int, default=100)
+    parser.add_argument("--num-rbf", type=int, default=50)
     parser.add_argument("--hidden-features", type=int, default=64)
     parser.add_argument("--lr", type=float, default=1e-2)
     parser.add_argument("--weight-decay", type=float, default=1e-10)

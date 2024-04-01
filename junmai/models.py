@@ -2,7 +2,7 @@ from typing import Optional
 import torch
 import lightning as pl
 import ray
-from .layers import JunmaiLayer, GaussianDropout, InductiveParameter, TransductiveParameter
+from .layers import JunmaiLayer, GaussianDropout, InductiveParameter, DistanceTransductiveParameter
 
 class JunmaiModel(pl.LightningModule):
     def __init__(
@@ -28,11 +28,12 @@ class JunmaiModel(pl.LightningModule):
                 out_features=hidden_features,
             )
         else:
-            self.semantic = TransductiveParameter(
+            self.semantic = DistanceTransductiveParameter(
                 in_features=in_features,
                 out_features=hidden_features,
                 hidden_features=hidden_features,
-                num_rbf=num_rbf,
+                in_num_rbf=num_rbf,
+                out_num_rbf=num_rbf,
             )
         
         self.dropout = GaussianDropout(alpha=alpha)
@@ -92,22 +93,21 @@ class JunmaiModel(pl.LightningModule):
             weight_decay=self.weight_decay
         )
 
-        # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        #     optimizer, 
-        #     mode="min", 
-        #     factor=self.factor, 
-        #     patience=self.patience, 
-        #     min_lr=1e-6,
-        #     verbose=True,
-        # )
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer, 
+            mode="min", 
+            factor=self.factor, 
+            patience=self.patience, 
+            min_lr=1e-6,
+            verbose=True,
+        )
 
-        # scheduler = {
-        #     "scheduler": scheduler,
-        #     "monitor": "val_loss_energy",
-        # }
+        scheduler = {
+            "scheduler": scheduler,
+            "monitor": "val_loss_energy",
+        }
     
-        # return [optimizer], [scheduler]
-        return optimizer
+        return [optimizer], [scheduler]
     
     
 

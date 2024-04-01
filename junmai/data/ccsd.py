@@ -6,6 +6,7 @@ from pathlib import Path
 import requests
 from torch.utils.data import TensorDataset, DataLoader
 CACHE_DIR = os.path.join(Path(__file__).parent, ".cache/")
+print(CACHE_DIR)
 
 class CCSD(pl.LightningDataModule):
     def __init__(
@@ -30,6 +31,7 @@ class CCSD(pl.LightningDataModule):
         self.train_path = os.path.join(CACHE_DIR, f"{self.name}_ccsd_t-train.npz")
         self.test_path = os.path.join(CACHE_DIR, f"{self.name}_ccsd_t-test.npz")
         if not os.path.exists(self.train_path):
+            os.makedirs(CACHE_DIR, exist_ok=True)
             r = requests.get(url, allow_redirects=True)
             open(self.train_path, 'wb').write(r.content)
             # unzip the file
@@ -49,10 +51,14 @@ class CCSD(pl.LightningDataModule):
         self.E_tr = E[idxs[:self.num_train]]
         self.F_tr = F[idxs[:self.num_train]]
         self.Z_tr = Z[idxs[:self.num_train]]
-        self.R_vl = R[idxs[self.num_train:self.num_train+self.num_val]]
-        self.E_vl = E[idxs[self.num_train:self.num_train+self.num_val]]
-        self.F_vl = F[idxs[self.num_train:self.num_train+self.num_val]]
-        self.Z_vl = Z[idxs[self.num_train:self.num_train+self.num_val]]
+        # self.R_vl = R[idxs[self.num_train:self.num_train+self.num_val]]
+        # self.E_vl = E[idxs[self.num_train:self.num_train+self.num_val]]
+        # self.F_vl = F[idxs[self.num_train:self.num_train+self.num_val]]
+        # self.Z_vl = Z[idxs[self.num_train:self.num_train+self.num_val]]
+        self.R_vl = self.R_tr
+        self.E_vl = self.E_tr
+        self.F_vl = self.F_tr
+        self.Z_vl = self.Z_tr
 
         data_test = np.load(self.test_path)
         self.R_te, self.E_te, self.F_te = data_test['R'], data_test['E'], data_test['F']

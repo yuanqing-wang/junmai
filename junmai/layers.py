@@ -70,13 +70,24 @@ class TransductiveParameter(torch.nn.Module):
 
 class DistanceTransductiveParameter(torch.nn.Module):
     def __init__(
+            self,
             in_features: int,
             out_features: int,
+            hidden_features: int,
             in_num_rbf: int,
             out_num_rbf: int,
             smearing: torch.nn.Module = ExpNormalSmearing,
+            activation: torch.nn.Module = torch.nn.SiLU(),
     ):
         super().__init__()
+        self.fc = torch.nn.Sequential(
+            torch.nn.Linear(2*in_features+in_num_rbf, hidden_features),
+            activation,
+            torch.nn.Linear(hidden_features, 2*out_features*out_num_rbf),
+        )
+        self.out_num_rbf = out_num_rbf
+        self.out_features = out_features
+        self.smearing = smearing(num_rbf=in_num_rbf)
     
     def forward(self, x, h):
         h = self.fc(h)
@@ -89,6 +100,13 @@ class DistanceTransductiveParameter(torch.nn.Module):
         x_minus_xt_norm_sq = (x_minus_xt.pow(2).sum(-1, keepdims=True) + EPSILON)
         x_minus_xt_norm = x_minus_xt_norm_sq.sqrt()
         x_minus_xt_smeared = self.smearing(x_minus_xt_norm)
+
+        h = self.fc(torch.cat([x_minus_xt_smeared, h], dim=-1))
+        h = h.reshape(*h.shape[:-1], self.num_rbf, 2 * self.out_features)
+        K, Q = h.chunk(2, -1)
+        Q = K
+        return (K, Q)
+
 
 
 class JunmaiLayer(torch.nn.Module):
