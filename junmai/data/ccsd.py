@@ -45,10 +45,10 @@ class CCSD(pl.LightningDataModule):
             (R, E, F, Z)
         )
         idxs = np.random.permutation(R.shape[0])
-        self.R_tr = R[idxs[:self.num_train]]
-        self.E_tr = E[idxs[:self.num_train]]
-        self.F_tr = F[idxs[:self.num_train]]
-        self.Z_tr = Z[idxs[:self.num_train]]
+        self.R_tr = R[idxs[:self.num_train]][:100]
+        self.E_tr = E[idxs[:self.num_train]][:100]
+        self.F_tr = F[idxs[:self.num_train]][:100]
+        self.Z_tr = Z[idxs[:self.num_train]][:100]
         self.E_tr = self.E_tr - self.E_tr.mean()
         # self.R_vl = R[idxs[self.num_train:self.num_train+self.num_val]]
         # self.E_vl = E[idxs[self.num_train:self.num_train+self.num_val]]

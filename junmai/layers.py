@@ -104,10 +104,7 @@ class DistanceTransductiveParameter(torch.nn.Module):
         h = self.fc(torch.cat([x_minus_xt_smeared, h], dim=-1))
         h = h.reshape(*h.shape[:-1], self.num_rbf, 2 * self.out_features)
         K, Q = h.chunk(2, -1)
-        Q = K
         return (K, Q)
-
-
 
 class JunmaiLayer(torch.nn.Module):
     def __init__(

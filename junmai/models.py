@@ -58,8 +58,7 @@ class JunmaiModel(pl.LightningModule):
         self.log("train_loss_energy", loss_energy)
         loss_force = torch.nn.functional.mse_loss(F_hat, F)
         self.log("train_loss_force", loss_force)
-        # loss = 1e-2 * loss_energy + loss_force
-        loss = loss_energy
+        loss = 1e-2 * loss_energy + loss_force
         return loss
     
     def validation_step(self, batch, batch_idx):
