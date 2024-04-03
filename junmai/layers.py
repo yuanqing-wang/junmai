@@ -80,8 +80,10 @@ class DistanceTransductiveParameter(torch.nn.Module):
             activation: torch.nn.Module = torch.nn.SiLU(),
     ):
         super().__init__()
+        self.fc_left = torch.nn.Linear(in_features, hidden_features, bias=False)
+        self.fc_right = torch.nn.Linear(in_features, hidden_features, bias=False)
         self.fc = torch.nn.Sequential(
-            torch.nn.Linear(2*in_features+in_num_rbf, hidden_features),
+            torch.nn.Linear(hidden_features+in_num_rbf, hidden_features),
             activation,
             torch.nn.Linear(hidden_features, 2*out_features*out_num_rbf),
         )
@@ -90,8 +92,9 @@ class DistanceTransductiveParameter(torch.nn.Module):
         self.smearing = smearing(num_rbf=in_num_rbf)
     
     def forward(self, x, h):
-        h = self.fc(h)
-        h = h.unsqueeze(-2) + h.unsqueeze(-3)
+        # h = self.fc(h)
+        h = self.fc_left(h.unsqueeze(-2)) + self.fc_right(h.unsqueeze(-3))
+
         # (N, N, 3)
         x_minus_xt = x.unsqueeze(-2) - x.unsqueeze(-3)
 
@@ -102,7 +105,7 @@ class DistanceTransductiveParameter(torch.nn.Module):
         x_minus_xt_smeared = self.smearing(x_minus_xt_norm)
 
         h = self.fc(torch.cat([x_minus_xt_smeared, h], dim=-1))
-        h = h.reshape(*h.shape[:-1], self.num_rbf, 2 * self.out_features)
+        h = h.reshape(*h.shape[:-1], self.out_num_rbf, 2 * self.out_features)
         K, Q = h.chunk(2, -1)
         return (K, Q)
 

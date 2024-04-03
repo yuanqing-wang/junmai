@@ -16,6 +16,7 @@ class CCSD(pl.LightningDataModule):
             num_workers: int = 1, 
             num_train: int = 950,
             num_val: int = 50,
+            normalize: bool = True
         ):
         super().__init__()
         self.name = name
@@ -23,6 +24,7 @@ class CCSD(pl.LightningDataModule):
         self.num_workers = num_workers
         self.num_train = num_train
         self.num_val = num_val
+        self.normalize = normalize
 
     def setup(self, stage=None):
         url = f"http://www.quantum-machine.org/gdml/data/npz/{self.name}_ccsd_t.zip"
@@ -44,12 +46,12 @@ class CCSD(pl.LightningDataModule):
             lambda x: torch.tensor(x, dtype=torch.float32),
             (R, E, F, Z)
         )
+        Z = torch.nn.functional.one_hot(Z.long()).float()
         idxs = np.random.permutation(R.shape[0])
-        self.R_tr = R[idxs[:self.num_train]][:100]
-        self.E_tr = E[idxs[:self.num_train]][:100]
-        self.F_tr = F[idxs[:self.num_train]][:100]
-        self.Z_tr = Z[idxs[:self.num_train]][:100]
-        self.E_tr = self.E_tr - self.E_tr.mean()
+        self.R_tr = R[idxs[:self.num_train]]
+        self.E_tr = E[idxs[:self.num_train]]
+        self.F_tr = F[idxs[:self.num_train]]
+        self.Z_tr = Z[idxs[:self.num_train]]
         # self.R_vl = R[idxs[self.num_train:self.num_train+self.num_val]]
         # self.E_vl = E[idxs[self.num_train:self.num_train+self.num_val]]
         # self.F_vl = F[idxs[self.num_train:self.num_train+self.num_val]]
@@ -66,7 +68,14 @@ class CCSD(pl.LightningDataModule):
             lambda x: torch.tensor(x, dtype=torch.float32),
             (self.R_te, self.E_te, self.F_te, self.Z_te)
         )
-        self.E_te = self.E_te - self.E_te.mean()
+        self.Z_te = torch.nn.functional.one_hot(self.Z_te.long()).float()
+
+        self.E_MEAN, self.E_STD = self.E_tr.mean(), self.E_tr.std()
+
+        if self.normalize:
+            self.E_tr = (self.E_tr - self.E_MEAN) / self.E_STD
+            self.F_tr = self.F_tr / self.E_STD
+
         self.ds_tr = TensorDataset(self.R_tr, self.E_tr, self.F_tr, self.Z_tr)
         self.ds_vl = TensorDataset(self.R_vl, self.E_vl, self.F_vl, self.Z_vl)
         self.ds_te = TensorDataset(self.R_te, self.E_te, self.F_te, self.Z_te)
