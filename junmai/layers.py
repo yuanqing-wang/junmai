@@ -163,15 +163,12 @@ class JunmaiLayer(torch.nn.Module):
             Q,
         )
 
-        print(x_minus_xt_basis_k.shape)
-
         # (N, N_COEFFICIENT, N_COEFFICIENT)
         x_att = torch.einsum(
-            "...ab, ...ac -> ...abc",
+            "...ba, ...ca -> ...bc",
             x_minus_xt_basis_k,
             x_minus_xt_basis_q,
         )# .flatten(-2, -1)
-        print(x_att.shape)
         x_att = x_att.flatten(-2, -1)
 
         # (N, N, N_COEFFICIENT)
