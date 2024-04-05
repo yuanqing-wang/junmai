@@ -123,8 +123,9 @@ class JunmaiLayer(torch.nn.Module):
         self.num_rbf = num_rbf
         self.fc_summary = torch.nn.Sequential(
             torch.nn.SiLU(),
-            torch.nn.Linear(hidden_features, out_features),
+            torch.nn.Linear(hidden_features*hidden_features, out_features),
         )
+    
     def forward(
         self,
         x: torch.Tensor,
@@ -162,12 +163,16 @@ class JunmaiLayer(torch.nn.Module):
             Q,
         )
 
-        # (N, N_COEFFICIENT)
+        print(x_minus_xt_basis_k.shape)
+
+        # (N, N_COEFFICIENT, N_COEFFICIENT)
         x_att = torch.einsum(
-            "...ab, ...ab -> ...a",
+            "...ab, ...ac -> ...abc",
             x_minus_xt_basis_k,
             x_minus_xt_basis_q,
-        )
+        )# .flatten(-2, -1)
+        print(x_att.shape)
+        x_att = x_att.flatten(-2, -1)
 
         # (N, N, N_COEFFICIENT)
         x_att = self.fc_summary(x_att)
