@@ -43,7 +43,7 @@ if __name__ == "__main__":
     parser.add_argument("--hidden-features", type=int, default=32)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--weight-decay", type=float, default=1e-10)
-    parser.add_argument("--batch-size", type=int, default=16)
+    parser.add_argument("--batch-size", type=int, default=128)
     parser.add_argument("--alpha", type=float, default=0.1)
     args = parser.parse_args()
     run(args)

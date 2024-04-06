@@ -123,6 +123,8 @@ class JunmaiLayer(torch.nn.Module):
         self.num_rbf = num_rbf
         self.fc_summary = torch.nn.Sequential(
             torch.nn.SiLU(),
+            torch.nn.Linear(hidden_features, hidden_features),
+            torch.nn.SiLU(),
             torch.nn.Linear(hidden_features, out_features),
         )
     def forward(
