@@ -14,7 +14,7 @@ class JunmaiModel(pl.LightningModule):
         lr: float = 1e-3,
         weight_decay: float = 1e-5,
         factor: float = 0.5,
-        patience: int = 10,
+        patience: int = 500,
         E_MEAN: float = 0.0,
         E_STD: float = 1.0,
     ):
@@ -31,7 +31,7 @@ class JunmaiModel(pl.LightningModule):
                 in_features=in_features,
                 out_features=hidden_features,
                 hidden_features=hidden_features,
-                in_num_rbf=num_rbf,
+                in_num_rbf=10,
                 out_num_rbf=num_rbf,
             )
         
@@ -49,18 +49,19 @@ class JunmaiModel(pl.LightningModule):
         self.E_STD = E_STD
 
     def forward(self, x, h):
-        K, Q = self.semantic(x.detach(), h)
-        # K, Q = self.semantic(x, h)
-        return self.layer(x, (K, Q)).sum(-2)
+        # K, Q = self.semantic(x.detach(), h)
+        K, Q = self.semantic(x, h)
+        y = self.layer(x, (K, Q)).sum(-2)
+        return y
     
     def training_step(self, batch, batch_idx):
         R, E, F, Z = batch
         R.requires_grad_(True)
         E_hat = self(R, Z)
         F_hat = -torch.autograd.grad(E_hat.sum(), R, create_graph=True)[0]
-        loss_energy = torch.nn.functional.l1_loss(E_hat, E)
+        loss_energy = torch.nn.functional.mse_loss(E_hat, E)
         self.log("train_loss_energy", loss_energy)
-        loss_force = torch.nn.functional.l1_loss(F_hat, F)
+        loss_force = torch.nn.functional.mse_loss(F_hat, F)
         self.log("train_loss_force", loss_force)
         loss = 1e-2 * loss_energy + loss_force
         return loss
@@ -90,22 +91,21 @@ class JunmaiModel(pl.LightningModule):
             weight_decay=self.weight_decay
         )
 
-        # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        #     optimizer, 
-        #     mode="min", 
-        #     factor=self.factor, 
-        #     patience=self.patience, 
-        #     min_lr=1e-6,
-        #     verbose=True,
-        # )
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer, 
+            mode="min", 
+            factor=self.factor, 
+            patience=self.patience, 
+            min_lr=1e-6,
+            verbose=True,
+        )
 
-        # scheduler = {
-        #     "scheduler": scheduler,
-        #     "monitor": "val_loss_energy",
-        # }
+        scheduler = {
+            "scheduler": scheduler,
+            "monitor": "val_loss_energy",
+        }
     
-        # return [optimizer], [scheduler]
-        return optimizer
+        return [optimizer], [scheduler]
     
     
 

@@ -21,7 +21,7 @@ class InductiveParameter(torch.nn.Module):
     ):
         super().__init__()
         self.K = torch.nn.Parameter(
-            torch.randn(
+            1e-2 * torch.randn(
                 num_particles, 
                 num_particles, 
                 num_rbf, 
@@ -30,7 +30,7 @@ class InductiveParameter(torch.nn.Module):
         )
 
         self.Q = torch.nn.Parameter(
-            torch.randn(
+            1e-2 * torch.randn(
                 num_particles, 
                 num_particles, 
                 num_rbf, 
@@ -122,9 +122,10 @@ class JunmaiLayer(torch.nn.Module):
         self.smearing = smearing(num_rbf=num_rbf)
         self.num_rbf = num_rbf
         self.fc_summary = torch.nn.Sequential(
+            torch.nn.Linear(hidden_features*hidden_features, hidden_features),
             torch.nn.SiLU(),
-            torch.nn.Linear(hidden_features*hidden_features, out_features),
-        )
+            torch.nn.Linear(hidden_features, out_features),
+        ) 
     
     def forward(
         self,

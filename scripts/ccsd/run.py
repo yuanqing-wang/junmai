@@ -7,24 +7,26 @@ def run(args):
     from junmai.data.ccsd import CCSD
     data = CCSD(args.name, batch_size=args.batch_size, normalize=True)
     data.setup()
+    print(data.E_STD)
 
     from junmai.models import JunmaiModel
     model = JunmaiModel(
         in_features=9,
         hidden_features=args.hidden_features,
         num_rbf=args.num_rbf,
-        # num_particles=9,
+        num_particles=9,
         lr=args.lr,
         weight_decay=args.weight_decay,
         E_MEAN=data.E_MEAN,
         E_STD=data.E_STD,
     )
 
-    print(model)
+    # from lightning.pytorch.callbacks import LearningRateMonitor
+    # lr_monitor = LearningRateMonitor(logging_interval='step')
 
     trainer = pl.Trainer(
-        limit_train_batches=100, 
-        max_epochs=10000, 
+        # limit_train_batches=100, 
+        max_epochs=1000000, 
         log_every_n_steps=1, 
         logger=CSVLogger("logs", name="junmai"),
         devices="auto",
@@ -43,7 +45,6 @@ if __name__ == "__main__":
     parser.add_argument("--hidden-features", type=int, default=32)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--weight-decay", type=float, default=1e-10)
-    parser.add_argument("--batch-size", type=int, default=16)
-    parser.add_argument("--alpha", type=float, default=0.1)
+    parser.add_argument("--batch-size", type=int, default=128)
     args = parser.parse_args()
     run(args)
