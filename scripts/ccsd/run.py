@@ -13,23 +13,30 @@ def run(args):
         in_features=9,
         hidden_features=args.hidden_features,
         num_rbf=args.num_rbf,
-        # num_particles=9,
+        num_particles=9,
         lr=args.lr,
         weight_decay=args.weight_decay,
         E_MEAN=data.E_MEAN,
         E_STD=data.E_STD,
     )
 
-    print(model)
+    from lightning.pytorch.callbacks import ModelCheckpoint
+    checkpoint_callback = ModelCheckpoint(
+        monitor="val_loss_energy",
+        mode="max",
+        verbose=True,
+        save_weights_only=True,
+        dirpath="checkpoints",
+    )
 
     trainer = pl.Trainer(
-        limit_train_batches=100, 
         max_epochs=10000, 
         log_every_n_steps=1, 
         logger=CSVLogger("logs", name="junmai"),
         devices="auto",
         accelerator="auto",
         enable_progress_bar=False,
+        callbacks=[checkpoint_callback],
     )
     trainer.fit(model, data)
 
