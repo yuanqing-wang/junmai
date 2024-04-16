@@ -14,7 +14,7 @@ def run(args):
         in_features=9,
         hidden_features=args.hidden_features,
         num_rbf=args.num_rbf,
-        num_particles=9,
+        # num_particles=9,
         lr=args.lr,
         weight_decay=args.weight_decay,
         E_MEAN=data.E_MEAN,

@@ -38,8 +38,17 @@ class InductiveParameter(torch.nn.Module):
             ),
         )
 
+        self.V = torch.nn.Parameter(
+            1e-2 * torch.randn(
+                num_particles,
+                num_particles,
+                num_rbf,
+                out_features,
+            ),
+        )
+
     def forward(self, *args, **kwargs):
-        return (self.K, self.Q)
+        return (self.K, self.Q, self.V)
 
 class TransductiveParameter(torch.nn.Module):
     def __init__(
@@ -85,7 +94,7 @@ class DistanceTransductiveParameter(torch.nn.Module):
         self.fc = torch.nn.Sequential(
             torch.nn.Linear(hidden_features+in_num_rbf, hidden_features),
             activation,
-            torch.nn.Linear(hidden_features, 2*out_features*out_num_rbf),
+            torch.nn.Linear(hidden_features, 3*out_features*out_num_rbf),
         )
         self.out_num_rbf = out_num_rbf
         self.out_features = out_features
@@ -105,9 +114,9 @@ class DistanceTransductiveParameter(torch.nn.Module):
         x_minus_xt_smeared = self.smearing(x_minus_xt_norm)
 
         h = self.fc(torch.cat([x_minus_xt_smeared, h], dim=-1))
-        h = h.reshape(*h.shape[:-1], self.out_num_rbf, 2 * self.out_features)
-        K, Q = h.chunk(2, -1)
-        return (K, Q)
+        h = h.reshape(*h.shape[:-1], self.out_num_rbf, 3 * self.out_features)
+        K, Q, V = h.chunk(3, -1)
+        return (K, Q, V)
 
 class JunmaiLayer(torch.nn.Module):
     def __init__(
@@ -122,7 +131,7 @@ class JunmaiLayer(torch.nn.Module):
         self.smearing = smearing(num_rbf=num_rbf)
         self.num_rbf = num_rbf
         self.fc_summary = torch.nn.Sequential(
-            torch.nn.Linear(hidden_features*hidden_features, hidden_features),
+            torch.nn.Linear(hidden_features, hidden_features),
             torch.nn.SiLU(),
             torch.nn.Linear(hidden_features, out_features),
         ) 
@@ -132,7 +141,7 @@ class JunmaiLayer(torch.nn.Module):
         x: torch.Tensor,
         W: torch.Tensor,
     ):  
-        K, Q = W
+        K, Q, V = W
 
         # (N, N, 3)
         x_minus_xt = x.unsqueeze(-2) - x.unsqueeze(-3)
@@ -164,13 +173,21 @@ class JunmaiLayer(torch.nn.Module):
             Q,
         )
 
-        # (N, N_COEFFICIENT, N_COEFFICIENT)
-        x_att = torch.einsum(
-            "...ba, ...ca -> ...bc",
-            x_minus_xt_basis_k,
-            x_minus_xt_basis_q,
-        )# .flatten(-2, -1)
-        x_att = x_att.flatten(-2, -1)
+        x_minus_xt_basis_V = torch.einsum(
+            "...nab, ...nac -> ...cb",
+            x_minus_xt_basis,
+            V,
+        )
+
+        # (N, N, N_COEFFICIENT)
+        x_att = torch.stack(
+            [
+                x_minus_xt_basis_k,
+                x_minus_xt_basis_q,
+                x_minus_xt_basis_V,
+            ],
+            dim=-1,
+        ).det()
 
         # (N, N, N_COEFFICIENT)
         x_att = self.fc_summary(x_att)
