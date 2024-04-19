@@ -121,6 +121,13 @@ class JunmaiLayer(torch.nn.Module):
         self.hidden_features = hidden_features
         self.smearing = smearing(num_rbf=num_rbf)
         self.num_rbf = num_rbf
+
+        self.fc_basis = torch.nn.Sequential(
+            torch.nn.Linear(hidden_features*hidden_features, hidden_features),
+            torch.nn.SiLU(),
+            torch.nn.Linear(hidden_features, 4*num_rbf*hidden_features, bias=False),
+        )
+
         self.fc_summary = torch.nn.Sequential(
             torch.nn.Linear(hidden_features*hidden_features, hidden_features),
             torch.nn.SiLU(),
@@ -164,13 +171,39 @@ class JunmaiLayer(torch.nn.Module):
             Q,
         )
 
-        # (N, N_COEFFICIENT, N_COEFFICIENT)
+        # (N, N, N_COEFFICIENT, N_COEFFICIENT)
         x_att = torch.einsum(
             "...ba, ...ca -> ...bc",
             x_minus_xt_basis_k,
             x_minus_xt_basis_q,
-        )# .flatten(-2, -1)
-        x_att = x_att.flatten(-2, -1)
+        ).flatten(-2, -1)
+
+        x_att = self.fc_basis(x_att)
+        x_att_left, x_att_right = x_att.chunk(2, -1)
+        x_att = x_att_left.unsqueeze(-2) + x_att_right.unsqueeze(-3)
+        K, Q = x_att.chunk(2, -1)
+        K = K.reshape(*K.shape[:-1], self.num_rbf, self.hidden_features)
+        Q = Q.reshape(*Q.shape[:-1], self.num_rbf, self.hidden_features)
+
+        # (N, N_COEFFICIENT, 3)
+        x_minus_xt_basis_k = torch.einsum(
+            "...nab, ...nac -> ...cb",
+            x_minus_xt_basis,
+            K,
+        )
+
+        x_minus_xt_basis_q = torch.einsum(
+            "...nab, ...nac -> ...cb",
+            x_minus_xt_basis,
+            Q,
+        )
+
+        # (N, N, N_COEFFICIENT, N_COEFFICIENT)
+        x_att = torch.einsum(
+            "...ba, ...ca -> ...bc",
+            x_minus_xt_basis_k,
+            x_minus_xt_basis_q,
+        ).flatten(-2, -1)
 
         # (N, N, N_COEFFICIENT)
         x_att = self.fc_summary(x_att)
