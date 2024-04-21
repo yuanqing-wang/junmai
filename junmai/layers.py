@@ -1,4 +1,4 @@
-from os import X_OK
+from os import X_OK, lseek
 from typing import Optional
 import math
 
@@ -121,6 +121,12 @@ class JunmaiLayer(torch.nn.Module):
         self.hidden_features = hidden_features
         self.smearing = smearing(num_rbf=num_rbf)
         self.num_rbf = num_rbf
+        self.fc_rbf = torch.nn.Sequential(
+            torch.nn.Linear(num_rbf, num_rbf),
+            torch.nn.SiLU(),
+            torch.nn.Linear(num_rbf, num_rbf),
+        )
+
         self.fc_summary = torch.nn.Sequential(
             torch.nn.Linear(hidden_features*hidden_features, hidden_features),
             torch.nn.SiLU(),
@@ -147,6 +153,7 @@ class JunmaiLayer(torch.nn.Module):
 
         # (N, N, N_RBF)
         x_minus_xt_smear = self.smearing(x_minus_xt_norm)
+        x_minus_xt_smear = self.fc_rbf(x_minus_xt_smear)
 
         # (N, N, N_RBF, 3)
         x_minus_xt_basis = x_minus_xt_smear.unsqueeze(-1) * x_minus_xt.unsqueeze(-2)
