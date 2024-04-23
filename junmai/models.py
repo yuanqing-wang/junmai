@@ -50,8 +50,8 @@ class JunmaiModel(pl.LightningModule):
 
     def forward(self, x, h):
         # K, Q = self.semantic(x.detach(), h)
-        K, Q, V = self.semantic(x, h)
-        y = self.layer(x, (K, Q, V)).sum(-2)
+        A, B, C, D = self.semantic(x, h)
+        y = self.layer(x, (A, B, C, D)).sum(-2)
         return y
     
     def training_step(self, batch, batch_idx):

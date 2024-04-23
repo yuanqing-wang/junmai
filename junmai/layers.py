@@ -94,7 +94,7 @@ class DistanceTransductiveParameter(torch.nn.Module):
         self.fc = torch.nn.Sequential(
             torch.nn.Linear(hidden_features+in_num_rbf, hidden_features),
             activation,
-            torch.nn.Linear(hidden_features, 3*out_features*out_num_rbf),
+            torch.nn.Linear(hidden_features, 4*out_features*out_num_rbf),
         )
         self.out_num_rbf = out_num_rbf
         self.out_features = out_features
@@ -114,9 +114,9 @@ class DistanceTransductiveParameter(torch.nn.Module):
         x_minus_xt_smeared = self.smearing(x_minus_xt_norm)
 
         h = self.fc(torch.cat([x_minus_xt_smeared, h], dim=-1))
-        h = h.reshape(*h.shape[:-1], self.out_num_rbf, 3 * self.out_features)
-        K, Q, V = h.chunk(3, -1)
-        return (K, Q, V)
+        h = h.reshape(*h.shape[:-1], self.out_num_rbf, 4 * self.out_features)
+        A, B, C, D = h.chunk(4, -1)
+        return (A, B, C, D)
 
 class JunmaiLayer(torch.nn.Module):
     def __init__(
@@ -141,7 +141,7 @@ class JunmaiLayer(torch.nn.Module):
         x: torch.Tensor,
         W: torch.Tensor,
     ):  
-        K, Q, V = W
+        A, B, C, D = W
 
         # (N, N, 3)
         x_minus_xt = x.unsqueeze(-2) - x.unsqueeze(-3)
@@ -161,33 +161,33 @@ class JunmaiLayer(torch.nn.Module):
         x_minus_xt_basis = x_minus_xt_smear.unsqueeze(-1) * x_minus_xt.unsqueeze(-2)
 
         # (N, N_COEFFICIENT, 3)
-        x_minus_xt_basis_k = torch.einsum(
+        x_minus_xt_basis_a = torch.einsum(
             "...nab, ...nac -> ...cb",
             x_minus_xt_basis,
-            K,
+            A,
         )
 
-        x_minus_xt_basis_q = torch.einsum(
+        x_minus_xt_basis_b = torch.einsum(
             "...nab, ...nac -> ...cb",
             x_minus_xt_basis,
-            Q,
+            B,
         )
 
-        x_minus_xt_basis_V = torch.einsum(
+        x_minus_xt_basis_c = torch.einsum(
             "...nab, ...nac -> ...cb",
             x_minus_xt_basis,
-            V,
+            C,
         )
 
-        # (N, N, N_COEFFICIENT)
-        x_att = torch.stack(
-            [
-                x_minus_xt_basis_k,
-                x_minus_xt_basis_q,
-                x_minus_xt_basis_V,
-            ],
-            dim=-1,
-        ).det()
+        x_minus_xt_basis_d = torch.einsum(
+            "...nab, ...nac -> ...cb",
+            x_minus_xt_basis,
+            D,
+        )
+
+        ab = torch.linalg.cross(x_minus_xt_basis_a, x_minus_xt_basis_b, dim=-1)
+        cd = torch.linalg.cross(x_minus_xt_basis_c, x_minus_xt_basis_d, dim=-1)
+        x_att = (ab * cd).sum(-1)
 
         # (N, N, N_COEFFICIENT)
         x_att = self.fc_summary(x_att)
