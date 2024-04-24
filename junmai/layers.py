@@ -128,7 +128,8 @@ class JunmaiLayer(torch.nn.Module):
         )
 
         self.fc_summary = torch.nn.Sequential(
-            torch.nn.Linear(hidden_features*hidden_features, hidden_features),
+            # torch.nn.Linear(hidden_features*hidden_features, hidden_features),
+            torch.nn.Linear(hidden_features, hidden_features),
             torch.nn.SiLU(),
             torch.nn.Linear(hidden_features, out_features),
         ) 
@@ -177,7 +178,10 @@ class JunmaiLayer(torch.nn.Module):
             x_minus_xt_basis_k,
             x_minus_xt_basis_q,
         )# .flatten(-2, -1)
-        x_att = x_att.flatten(-2, -1)
+
+        # x_att = x_att.prod(-1)
+        x_att = x_att.logsumexp(-1)
+        x_att = x_att.flatten(-1)
 
         # (N, N, N_COEFFICIENT)
         x_att = self.fc_summary(x_att)
